@@ -342,3 +342,96 @@ class InternGitSafetyService:
         if not pushed["success"]:
             return {"success": False, "message": pushed["stderr"] or "Push main ditolak; tidak ada force-push dilakukan."}
         return {"success": True, "branch": branch, "message": "Branch mission telah dipromosikan ke main dan di-push."}
+
+    def create_pull_request(
+        self,
+        mission_id: str,
+        title: str,
+        summary: str,
+        issue_number: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        AI Intern: Membuat Pull Request (PR) otomatis dari branch mission ke main.
+        Lolos Security Gate sebelum diajukan ke GitHub.
+        """
+        import os
+        import shutil
+
+        # 1. Security Gate: Pastikan ringkasan/title tidak mengandung rahasia
+        if self.is_sensitive_task(title, summary):
+            return {
+                "success": False,
+                "is_sensitive": True,
+                "message": "PR dibatalkan oleh Security Gate: Terdeteksi kredensial/rahasia sensitif."
+            }
+
+        try:
+            branch = self._mission_branch(mission_id)
+        except ValueError as error:
+            return {"success": False, "message": str(error)}
+
+        repo = "Inineo/TUYUL-Orchestra"
+        pr_title = f"[PR] {title.strip()}" if not title.startswith("[PR]") else title.strip()
+        body_lines = [
+            f"## 🤖 Autonomous Mission PR: `{branch}`",
+            "",
+            "### 📝 Ringkasan Pekerjaan",
+            summary.strip(),
+            "",
+            "### 🛡️ Status Audit Kualitas",
+            "- [x] Lolos Internal QA & Security Gate Strix",
+            "- [x] Terisolasi pada mission branch mandiri",
+        ]
+        if issue_number:
+            body_lines.append(f"\nFixes #{issue_number}")
+
+        pr_body = "\n".join(body_lines)
+
+        # 2. Gunakan GitHub CLI (`gh`) jika tersedia
+        gh_path = shutil.which("gh") or r"C:\Program Files\GitHub CLI\gh.exe"
+        if os.path.exists(gh_path) or shutil.which("gh"):
+            try:
+                cmd = [
+                    gh_path, "pr", "create",
+                    "--repo", repo,
+                    "--base", "main",
+                    "--head", branch,
+                    "--title", pr_title,
+                    "--body", pr_body
+                ]
+                res = subprocess.run(
+                    cmd,
+                    cwd=str(self.repo_root),
+                    capture_output=True,
+                    text=True,
+                    timeout=25
+                )
+                if res.returncode == 0:
+                    pr_url = res.stdout.strip()
+                    pr_num = pr_url.split("/")[-1] if "/" in pr_url else ""
+                    return {
+                        "success": True,
+                        "pr_url": pr_url,
+                        "pr_number": pr_num,
+                        "branch": branch,
+                        "method": "gh_cli",
+                        "message": f"Pull Request #{pr_num} berhasil dibuat."
+                    }
+                else:
+                    err_msg = res.stderr.strip()
+                    if "already exists" in err_msg.lower():
+                        return {
+                            "success": True,
+                            "already_exists": True,
+                            "branch": branch,
+                            "message": "Pull Request untuk branch ini sudah ada di GitHub."
+                        }
+                    return {"success": False, "message": f"Gagal membuat PR via gh: {err_msg}"}
+            except Exception as e:
+                return {"success": False, "message": str(e)}
+
+        return {
+            "success": False,
+            "message": "GitHub CLI (`gh`) tidak ditemukan untuk eksekusi pembuatan PR."
+        }
+

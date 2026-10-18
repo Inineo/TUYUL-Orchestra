@@ -90,6 +90,8 @@ export interface Task {
     text: string;
     completed: boolean;
   }[];
+  prUrl?: string;
+  prNumber?: string;
 }
 
 export type EventType =

@@ -144,6 +144,25 @@ class MissionCommitRequest(BaseModel):
 class MissionMergeRequest(BaseModel):
     confirmation: str
 
+class MissionPRRequest(BaseModel):
+    title: str
+    summary: str
+    issue_number: Optional[str] = None
+
+@app.post("/api/intern/missions/{mission_id}/create-pr")
+def create_mission_pr_api(mission_id: str, req: MissionPRRequest):
+    """Intern otomatis membuat Pull Request untuk mission branch ke main."""
+    intern_service = InternGitSafetyService(Path(__file__).resolve().parent.parent)
+    result = intern_service.create_pull_request(
+        mission_id=mission_id,
+        title=req.title,
+        summary=req.summary,
+        issue_number=req.issue_number
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("message", "Gagal membuat PR"))
+    return result
+
 @app.post("/api/intern/missions/{mission_id}/commit-and-push")
 def commit_and_push_mission_api(mission_id: str, req: MissionCommitRequest):
     """Intern otomatis commit dan push hanya ke branch mission, bukan main."""
@@ -204,6 +223,17 @@ def review_mission_api(req: PMReviewRequest):
             obsidian_service.delete_mission_plan(req.mission_id)
             intern_service = InternGitSafetyService(Path(__file__).resolve().parent.parent)
             git_result = intern_service.commit_and_push_mission(req.mission_id, req.goal)
+            
+            # Otomatis buat Pull Request setelah commit & push berhasil
+            pr_result = None
+            if git_result.get("success"):
+                pr_result = intern_service.create_pull_request(
+                    mission_id=req.mission_id,
+                    title=req.goal,
+                    summary=f"Automated PR for mission {req.mission_id}.\nFeedback PM: {review_result.get('feedback', 'Approved')}"
+                )
+            if pr_result:
+                git_result["pr"] = pr_result
 
     return {
         "success": True,
@@ -312,6 +342,85 @@ def list_tasks_api(mission_id: Optional[str] = None, status: Optional[str] = Non
     from services.database import Database
     tasks = Database.list_tasks(mission_id=mission_id, status=status, limit=limit)
     return {"success": True, "total": len(tasks), "tasks": tasks}
+
+class CreateSingleTaskRequest(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    role: Optional[str] = None
+    priority: Optional[str] = "medium"
+    mission_id: Optional[str] = None
+    criteria: Optional[str] = ""
+
+@app.post("/api/tasks")
+def create_single_task_api(req: CreateSingleTaskRequest):
+    """
+    Hybrid Direct Task Injection:
+    Membuat single ticket langsung tanpa melalui PM Decompose.
+    Mendukung auto-inferensi role atau explicit override via @role tag.
+    """
+    import uuid
+    import re
+    from services.database import Database
+
+    raw_title = req.title.strip()
+    target_role = (req.role or "").strip().lower()
+
+    # 1. Cek explicit override tag: misal @frontend: ..., @backend: ..., [QA] ...
+    tag_match = re.search(r"[@\[](frontend|backend|qa|intern|researcher|reviewer)[\]:]?", raw_title, re.IGNORECASE)
+    if tag_match:
+        target_role = tag_match.group(1).lower()
+        # Bersihkan tag dari title
+        clean_title = re.sub(r"[@\[](frontend|backend|qa|intern|researcher|reviewer)[\]:]?\s*", "", raw_title, flags=re.IGNORECASE).strip()
+    else:
+        clean_title = raw_title
+
+    # 2. Auto-inferensi jika role belum ditentukan
+    if not target_role:
+        lower_txt = f"{clean_title} {req.description}".lower()
+        if any(k in lower_txt for k in ["html", "css", "ui", "tampilan", "komponen", "button", "layout", "halaman", "modal", "react"]):
+            target_role = "frontend"
+        elif any(k in lower_txt for k in ["api", "database", "sqlite", "query", "endpoint", "route", "server", "fastapi"]):
+            target_role = "backend"
+        elif any(k in lower_txt for k in ["test", "testing", "audit", "cwe", "security", "scan", "qa", "bug"]):
+            target_role = "qa"
+        elif any(k in lower_txt for k in ["git", "branch", "pr", "push", "commit", "obsidian", "doc", "link"]):
+            target_role = "intern"
+        elif any(k in lower_txt for k in ["riset", "paper", "referensi", "cari", "docs"]):
+            target_role = "researcher"
+        else:
+            target_role = "frontend"
+
+    task_id = str(uuid.uuid4())[:8]
+    mission_id = req.mission_id or f"direct-{task_id[:4]}"
+
+    # Pastikan mission parent ada jika dibuat ad-hoc
+    existing_mission = Database.get_mission(mission_id)
+    if not existing_mission:
+        Database.create_mission(
+            mission_id=mission_id,
+            title=clean_title,
+            goal=clean_title,
+            requirements=[]
+        )
+
+    task = Database.create_task(
+        task_id=task_id,
+        mission_id=mission_id,
+        title=clean_title,
+        description=req.description or clean_title,
+        assigned_to=f"agent-{target_role}",
+        criteria=req.criteria or ""
+    )
+
+    return {
+        "success": True,
+        "task_id": task_id,
+        "mission_id": mission_id,
+        "role": target_role,
+        "title": clean_title,
+        "assigned_to": f"agent-{target_role}",
+        "message": f"Single ticket berhasil dibuat langsung untuk {target_role} (bypassed PM)."
+    }
 
 # --- Agents Registry ---
 

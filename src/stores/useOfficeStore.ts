@@ -531,6 +531,37 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
               taskKey: associatedTask.key,
             });
 
+            // Jika reviewer/QA menyelesaikan audit (nextStatus === 'done'), Intern otomatis push & open PR
+            if (nextStatus === 'done' && (luckyAgent.role === 'reviewer' || luckyAgent.role === 'qa')) {
+              const missionId = associatedTask.key.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+              fetch(`/api/backend/intern/missions/${missionId}/create-pr`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: associatedTask.title,
+                  summary: `Audit diselesaikan oleh ${luckyAgent.name} (${luckyAgent.role.toUpperCase()}).\n\nDeskripsi Task:\n${associatedTask.description}`,
+                }),
+              })
+                .then((r) => r.json())
+                .then((prRes) => {
+                  if (prRes.success && prRes.pr_url) {
+                    set((s) => ({
+                      tasks: s.tasks.map((t) =>
+                        t.id === associatedTask.id
+                          ? { ...t, prUrl: prRes.pr_url, prNumber: prRes.pr_number }
+                          : t
+                      ),
+                    }));
+                    state.addEvent({
+                      type: 'artifact',
+                      message: `[PR] AI Intern membuka Pull Request untuk ${associatedTask.key}: ${prRes.pr_url}`,
+                      details: prRes.pr_url,
+                    });
+                  }
+                })
+                .catch(() => {});
+            }
+
             // Relieve current agent into casual idle break leaving the desk
             const casualActivities: ('coffee' | 'phone' | 'stretch' | 'nap')[] = [
               'coffee',

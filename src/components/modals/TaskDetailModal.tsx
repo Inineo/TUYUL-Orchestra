@@ -162,6 +162,59 @@ export const TaskDetailModal: React.FC = () => {
             </div>
           </div>
 
+          {/* Git Branch & Pull Request Lifecycle Status */}
+          <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-3 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 font-medium">
+                Git Branch & Pull Request
+              </div>
+              <div className="text-[11px] font-mono text-zinc-300">
+                Branch: <span className="text-emerald-400 font-semibold">intern/mission-{task.key.toLowerCase()}</span>
+              </div>
+            </div>
+            {task.prUrl ? (
+              <a
+                href={task.prUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-[11px] font-medium transition flex items-center gap-1.5"
+              >
+                <span>Lihat PR {task.prNumber ? `#${task.prNumber}` : ''}</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            ) : (
+              <button
+                onClick={() => {
+                  const missionId = task.key.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+                  fetch(`/api/backend/intern/missions/${missionId}/create-pr`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      title: task.title,
+                      summary: `Manual trigger PR creation untuk ${task.key}.\nDeskripsi:\n${task.description}`,
+                    }),
+                  })
+                    .then((r) => r.json())
+                    .then((res) => {
+                      if (res.success && res.pr_url) {
+                        useOfficeStore.setState((s) => ({
+                          tasks: s.tasks.map((t) =>
+                            t.id === task.id ? { ...t, prUrl: res.pr_url, prNumber: res.pr_number } : t
+                          ),
+                        }));
+                      } else {
+                        alert(res.message || 'Gagal membuat PR');
+                      }
+                    })
+                    .catch((err) => alert(String(err)));
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[11px] font-medium transition cursor-pointer"
+              >
+                Buat PR via Intern
+              </button>
+            )}
+          </div>
+
           {/* Subtasks Checklist */}
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-3.5 space-y-2">
             <div className="flex items-center justify-between">

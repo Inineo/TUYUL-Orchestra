@@ -296,6 +296,39 @@ location: {self.project_name}/conversation/{file_name}
             f.write(header + content.strip() + "\n")
         return file_path
 
+    def save_doc(
+        self,
+        title: str,
+        content: str,
+        tags: Optional[List[str]] = None
+    ) -> Path:
+        """Menyimpan SOP / panduan arsitektur ke subfolder docs/."""
+        safe_title = self._sanitize_filename(title)
+        file_name = f"{safe_title}.md"
+        file_path = self.docs_path / file_name
+
+        proj_slug = self.project_name.lower()
+        tag_list = tags or [f"{proj_slug}/docs", f"{proj_slug}/architecture"]
+        header = f"""---
+project: {self.project_name}
+type: architecture-doc
+date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+tags: {" ".join([f"#{t}" for t in tag_list])}
+location: {self.project_name}/docs/{file_name}
+---
+
+# 📖 {title}
+
+> **Project Hub**: [[{self.project_name}-Index]]  
+> **Folder Path**: `antigravity/{self.project_name}/docs/`  
+
+---
+
+"""
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(header + content.strip() + "\n")
+        return file_path
+
     def list_notes(self) -> List[Dict[str, Any]]:
         """Membaca daftar file markdown di seluruh subfolder project saat ini."""
         notes = []
