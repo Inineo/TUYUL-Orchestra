@@ -17,15 +17,15 @@ NINEROUTER_API_KEY = os.getenv("VITE_9ROUTER_API_KEY", "")
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "openai/gpt-4o-mini")
 
 # Obsidian Vault Configuration
-# Root: D:\Obsidian\Obsidian Memories\antigravity
-DEFAULT_OBSIDIAN_DIR = r"D:\Obsidian\Obsidian Memories\antigravity"
+# Default fallback uses user home directory (cross-platform)
+DEFAULT_OBSIDIAN_DIR = str(Path.home() / "Documents" / "Obsidian" / "antigravity")
 OBSIDIAN_VAULT_PATH = Path(os.getenv("OBSIDIAN_ANTIGRAVITY_PATH", DEFAULT_OBSIDIAN_DIR))
 
 # Project Subfolder Configuration
 CURRENT_PROJECT_NAME = os.getenv("CURRENT_PROJECT_NAME", "Kibi-Orchestra")
 PROJECT_VAULT_PATH = OBSIDIAN_VAULT_PATH / CURRENT_PROJECT_NAME
 
-# Ensure the directories exist
+# Ensure the directories exist safely without breaking backend if path is inaccessible
 try:
     OBSIDIAN_VAULT_PATH.mkdir(parents=True, exist_ok=True)
     PROJECT_VAULT_PATH.mkdir(parents=True, exist_ok=True)

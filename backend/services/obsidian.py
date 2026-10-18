@@ -77,7 +77,7 @@ Selamat datang di ruang kerja proyek **{clean_name}**.
 ## 📂 Struktur Direktori Proyek
 
 ```
-D:\\Obsidian\\Obsidian Memories\\antigravity\\{clean_name}\\
+{proj_dir}\\
 │
 ├── plan/             --> Menyimpan dokumen rencana misi & sprint teknis
 ├── conversation/     --> Menyimpan log obrolan & ekspor chat ChatGPT browser

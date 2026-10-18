@@ -3,9 +3,18 @@ Setup & Konfigurasi Visual Obsidian Vault
 Mengatur tampilan tema, glow effect (CSS snippet & plugin), dan palet warna Graph View.
 """
 import json
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-VAULT_ROOT = Path(r"D:\Obsidian\Obsidian Memories")
+# Load env
+env_root = Path(__file__).resolve().parent.parent.parent / '.env'
+if env_root.exists():
+    load_dotenv(env_root)
+
+# Ambil path root vault dari env atau fallback ke parent dari antigravity path / home
+default_vault = Path(os.getenv("OBSIDIAN_ANTIGRAVITY_PATH", str(Path.home() / "Documents" / "Obsidian"))).parent
+VAULT_ROOT = Path(os.getenv("OBSIDIAN_VAULT_ROOT", str(default_vault)))
 
 def install_neon_glow_snippet():
     """Memasang CSS snippet neon-glow-graph.css ke .obsidian/snippets"""
