@@ -24,7 +24,14 @@ export default function App() {
     toggleSimulation,
     selectAgent,
     selectTask,
+    initEventStream,
   } = useOfficeStore();
+
+  // Mount Real-Time SSE Bridge to FastAPI backend
+  useEffect(() => {
+    const cleanup = initEventStream();
+    return () => cleanup();
+  }, [initEventStream]);
 
   // Run real-time autonomous simulation loop in background
   useEffect(() => {

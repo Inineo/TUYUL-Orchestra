@@ -1,15 +1,59 @@
 import os
-from fastapi import FastAPI, HTTPException
+import json
+import asyncio
+from datetime import datetime
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
+from pathlib import Path
 
 from config import OBSIDIAN_VAULT_PATH, NINEROUTER_URL
 from services.obsidian import ObsidianService
 from services.caveman import CavemanCompressor
 from services.orchestrator import WorkflowOrchestrator
 from services.intern_safety import InternGitSafetyService
-from pathlib import Path
+
+class EventBroadcaster:
+    """Pub/Sub SSE Broadcaster untuk streaming update agen & task ke UI secara real-time."""
+    def __init__(self):
+        self._subscribers: Set[asyncio.Queue] = set()
+
+    def subscribe(self) -> asyncio.Queue:
+        q = asyncio.Queue()
+        self._subscribers.add(q)
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue):
+        self._subscribers.discard(q)
+
+    async def broadcast(self, event_type: str, data: Dict[str, Any]):
+        payload = {
+            "type": event_type,
+            "data": data,
+            "timestamp": datetime.now().strftime("%H:%M:%S")
+        }
+        for q in list(self._subscribers):
+            try:
+                await q.put(payload)
+            except Exception:
+                self._subscribers.discard(q)
+
+    def broadcast_sync(self, event_type: str, data: Dict[str, Any]):
+        """Versi synchronous untuk dipanggil dari route synchronous FastAPI."""
+        payload = {
+            "type": event_type,
+            "data": data,
+            "timestamp": datetime.now().strftime("%H:%M:%S")
+        }
+        for q in list(self._subscribers):
+            try:
+                q.put_nowait(payload)
+            except Exception:
+                pass
+
+broadcaster = EventBroadcaster()
 
 app = FastAPI(
     title="TUYUL Orchestra — Task Unified Yield & Utility Layer",
@@ -28,6 +72,37 @@ app.add_middleware(
 
 obsidian_service = ObsidianService()
 orchestrator = WorkflowOrchestrator()
+
+@app.get("/api/events/stream")
+async def event_stream_api(request: Request):
+    """Server-Sent Events (SSE) live bridge endpoint untuk streaming event ke UI."""
+    q = broadcaster.subscribe()
+
+    async def event_generator():
+        try:
+            # Kirim welcome/handshake event
+            yield f"event: connected\ndata: {json.dumps({'message': 'TUYUL Orchestra SSE Live Connected'})}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    payload = await asyncio.wait_for(q.get(), timeout=15.0)
+                    yield f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+                except asyncio.TimeoutError:
+                    # Keep-alive heartbeat comment
+                    yield ": ping\n\n"
+        finally:
+            broadcaster.unsubscribe(q)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @app.on_event("startup")
 def startup_db():
@@ -161,6 +236,15 @@ def create_mission_pr_api(mission_id: str, req: MissionPRRequest):
     )
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("message", "Gagal membuat PR"))
+
+    # Broadcast event ke SSE
+    broadcaster.broadcast_sync("pr_created", {
+        "mission_id": mission_id,
+        "pr_url": result.get("pr_url"),
+        "pr_number": result.get("pr_number"),
+        "title": req.title
+    })
+
     return result
 
 @app.post("/api/intern/missions/{mission_id}/commit-and-push")
@@ -412,6 +496,17 @@ def create_single_task_api(req: CreateSingleTaskRequest):
         criteria=req.criteria or ""
     )
 
+    # Broadcast task created via SSE
+    broadcaster.broadcast_sync("task_created", {
+        "task_id": task_id,
+        "mission_id": mission_id,
+        "title": clean_title,
+        "description": req.description or clean_title,
+        "role": target_role,
+        "priority": req.priority or "medium",
+        "assigned_to": f"agent-{target_role}"
+    })
+
     return {
         "success": True,
         "task_id": task_id,
@@ -517,6 +612,12 @@ def complete_task_api(task_id: str, req: CompleteTaskRequest):
         summary=req.result_summary,
         description=""
     )
+    broadcaster.broadcast_sync("task_completed", {
+        "task_id": task_id,
+        "status": "completed",
+        "summary": req.result_summary,
+        "artifact": artifact
+    })
     return {"success": True, "task_id": task_id, "status": "completed", "artifact": artifact}
 
 @app.patch("/api/tasks/{task_id}/status")
@@ -524,6 +625,10 @@ def update_task_status_api(task_id: str, status: str = "in_progress"):
     """Update status task (pending, assigned, in_progress, completed, blocked)."""
     from services.database import Database
     Database.update_task_status(task_id, status)
+    broadcaster.broadcast_sync("task_status_updated", {
+        "task_id": task_id,
+        "status": status
+    })
     return {"success": True, "task_id": task_id, "status": status}
 
 if __name__ == "__main__":

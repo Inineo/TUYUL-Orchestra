@@ -201,6 +201,12 @@ export const ShadcnLayout: React.FC<ShadcnLayoutProps> = ({
             <Badge variant="outline" className="hidden sm:inline-flex text-zinc-400">
               {progressPct}% SELESAI
             </Badge>
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-zinc-800 bg-zinc-950 font-mono text-[10px]">
+              <span className={`h-1.5 w-1.5 rounded-full ${useOfficeStore((s) => s.isLiveConnected) ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+              <span className={useOfficeStore((s) => s.isLiveConnected) ? 'text-emerald-400 font-medium' : 'text-zinc-500'}>
+                {useOfficeStore((s) => s.isLiveConnected) ? 'SSE LIVE' : 'OFFLINE'}
+              </span>
+            </div>
           </div>
 
           {/* Action Toolbar */}

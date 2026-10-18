@@ -39,6 +39,10 @@ export default defineConfig(() => {
           target: 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
+        '/api/events': {
+          target: 'http://127.0.0.1:8000',
+          changeOrigin: true,
+        },
         '/api/9router': {
           target: 'http://127.0.0.1:20128',
           changeOrigin: true,

@@ -81,6 +81,10 @@ interface OfficeState {
   triggerEscalation: () => void;
   resolveEscalation: () => void;
   injectBugTest: () => void;
+
+  // Real-Time SSE Bridge
+  isLiveConnected: boolean;
+  initEventStream: () => () => void;
 }
 
 const getFormattedTime = (): string => {
@@ -162,6 +166,7 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
   soundEnabled: false,
   eventFilter: 'all',
   isCreateTaskModalOpen: false,
+  isLiveConnected: false,
 
   getStats: () => {
     const { agents, tasks } = get();
@@ -1007,5 +1012,117 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
     });
 
     if (soundEnabled) playSound('alert');
+  },
+
+  initEventStream: () => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: any = null;
+
+    const connect = () => {
+      try {
+        eventSource = new EventSource('/api/events/stream');
+
+        eventSource.onopen = () => {
+          set({ isLiveConnected: true });
+        };
+
+        eventSource.addEventListener('connected', (e: MessageEvent) => {
+          try {
+            const payload = JSON.parse(e.data);
+            get().addEvent({
+              type: 'start',
+              message: `[BRIDGE] ${payload.message || 'Live SSE Terhubung'}`,
+            });
+          } catch {}
+        });
+
+        eventSource.addEventListener('task_created', (e: MessageEvent) => {
+          try {
+            const raw = JSON.parse(e.data);
+            const data = raw.data || raw;
+            const existing = get().tasks.find((t) => t.id === data.task_id);
+            if (!existing) {
+              get().addTask({
+                title: data.title,
+                description: data.description || '',
+                priority: data.priority || 'medium',
+                tags: [data.role ? data.role.toUpperCase() : 'TASK'],
+              });
+              get().addEvent({
+                type: 'start',
+                message: `[LIVE SSE] Tiket baru masuk dari backend: "${data.title}"`,
+                details: `Role: ${data.role || 'General'}`,
+              });
+            }
+          } catch {}
+        });
+
+        eventSource.addEventListener('pr_created', (e: MessageEvent) => {
+          try {
+            const raw = JSON.parse(e.data);
+            const data = raw.data || raw;
+            get().addEvent({
+              type: 'artifact',
+              message: `[LIVE SSE] Pull Request dibuat otomatis: ${data.title}`,
+              details: data.pr_url,
+            });
+            // Update link PR pada task yang cocok
+            set((s) => ({
+              tasks: s.tasks.map((t) =>
+                t.title.toLowerCase().includes(data.title.toLowerCase()) || (t.key && data.mission_id && data.mission_id.includes(t.key.toLowerCase()))
+                  ? { ...t, prUrl: data.pr_url, prNumber: data.pr_number }
+                  : t
+              ),
+            }));
+          } catch {}
+        });
+
+        eventSource.addEventListener('task_status_updated', (e: MessageEvent) => {
+          try {
+            const raw = JSON.parse(e.data);
+            const data = raw.data || raw;
+            get().addEvent({
+              type: 'progress',
+              message: `[LIVE SSE] Status task #${data.task_id} diupdate ke ${data.status}`,
+            });
+          } catch {}
+        });
+
+        eventSource.addEventListener('task_completed', (e: MessageEvent) => {
+          try {
+            const raw = JSON.parse(e.data);
+            const data = raw.data || raw;
+            get().addEvent({
+              type: 'complete',
+              message: `[LIVE SSE] Task #${data.task_id} selesai. Artefak ringkasan tersimpan.`,
+              details: data.summary,
+            });
+          } catch {}
+        });
+
+        eventSource.onerror = () => {
+          set({ isLiveConnected: false });
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          // Retry reconnection after 5 seconds
+          reconnectTimeout = setTimeout(connect, 5000);
+        };
+      } catch (err) {
+        set({ isLiveConnected: false });
+        reconnectTimeout = setTimeout(connect, 5000);
+      }
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (eventSource) {
+        eventSource.close();
+        set({ isLiveConnected: false });
+      }
+    };
   },
 }));
