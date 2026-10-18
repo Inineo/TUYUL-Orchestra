@@ -488,20 +488,19 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
     const runningTasks = tasks.filter((t) => t.status === 'running');
     const reviewTasks = tasks.filter((t) => t.status === 'review');
 
-    // --- 1. RESOLVE BLOCKED AGENTS AUTONOMOUSLY (Architect unblocks) ---
+    // --- 1. RESOLVE BLOCKED AGENTS AUTONOMOUSLY (PM & Engineering resolution) ---
     if (blockedAgents.length > 0 && Math.random() > 0.4) {
       const blocked = blockedAgents[0];
-      const architect = agents.find((a) => a.role === 'architect');
       get().updateAgent(blocked.id, {
         status: 'coding',
         idleActivity: 'standby',
         locationState: 'at_desk',
-        currentThought: '[OK] Dependency contract disetujui oleh Architect Dr. Marcus Chen. Melanjutkan eksekusi di meja...',
+        currentThought: '[OK] Schema contract diselaraskan oleh Lead PM & Antigravity. Melanjutkan eksekusi di meja...',
         currentAction: 'Menulis patch dan validasi endpoint handler di meja kerja',
       });
       state.addEvent({
         type: 'complete',
-        message: `[OK] Architect Dr. Marcus Chen menyetujui RFC dan membuka blokir ${blocked.name}`,
+        message: `[OK] Lead PM & Tim menyelaraskan kontrak dan membuka blokir ${blocked.name}`,
         agentId: blocked.id,
         details: 'Subnet proxy whitelist diterapkan ke gateway.',
       });
@@ -960,7 +959,7 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
 
     updateAgent(candidate.id, {
       status: 'blocked',
-      currentThought: '[ALERT] ESCALATION: Upstream schema contract mismatch detected! Awaiting architect approval.',
+      currentThought: '[ALERT] ESCALATION: Upstream schema contract mismatch detected! Awaiting resolution.',
       currentAction: 'Blocked by dependency on /api/v1/jwks endpoint failure',
     });
 
@@ -968,7 +967,7 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
       type: 'escalation',
       message: `[ALERT] ESCALATION: ${candidate.name} is BLOCKED on ${candidate.currentTask || 'task execution'}!`,
       agentId: candidate.id,
-      details: 'Critical dependency failure reported. Alert sent to Dr. Marcus Chen (Architect).',
+      details: 'Critical dependency failure reported. Alert sent to Lead PM & Antigravity.',
     });
 
     if (soundEnabled) playSound('alert');
@@ -981,13 +980,13 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
 
     updateAgent(blockedAgent.id, {
       status: 'coding',
-      currentThought: '[OK] Blocker resolved by Architect approval. Resuming code execution...',
+      currentThought: '[OK] Blocker resolved by PM & Antigravity patch. Resuming code execution...',
       currentAction: 'Compiling patched endpoint handler',
     });
 
     addEvent({
       type: 'complete',
-      message: `[OK] Blocker resolved for ${blockedAgent.name} by Systems Architect!`,
+      message: `[OK] Blocker resolved for ${blockedAgent.name} by Antigravity Patch!`,
       agentId: blockedAgent.id,
       details: 'CIDR header subnet whitelisted in reverse proxy configuration.',
     });

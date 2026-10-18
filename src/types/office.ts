@@ -5,14 +5,7 @@ export type AgentRole =
   | 'backend'
   | 'qa'
   | 'intern'
-  | 'strategist'
-  | 'architect'
-  | 'planner'
-  | 'developer'
-  | 'reviewer'
-  | 'tester'
-  | 'devops'
-  | 'security';
+  | 'reviewer';
 
 export type AgentStatus =
   | 'idle'

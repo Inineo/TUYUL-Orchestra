@@ -38,19 +38,12 @@ const PRESET_MODELS = [
 
 export const ROLE_OPTIONS: { id: AgentRole; label: string; department: AgentDepartment }[] = [
   { id: 'product_manager', label: 'Product Manager (PM)', department: 'orchestra' },
-  { id: 'researcher', label: 'Research Specialist & Knowledge', department: 'orchestra' },
-  { id: 'frontend', label: 'Front End Engineer', department: 'developer' },
-  { id: 'backend', label: 'Back End Engineer', department: 'developer' },
-  { id: 'qa', label: 'QA Automation Engineer', department: 'developer' },
-  { id: 'intern', label: 'Git & Docs Intern', department: 'developer' },
-  { id: 'strategist', label: 'Workforce Strategist', department: 'orchestra' },
-  { id: 'architect', label: 'Systems Architect', department: 'developer' },
-  { id: 'developer', label: 'Full-Stack Developer', department: 'developer' },
-  { id: 'reviewer', label: 'Code Reviewer & Quality', department: 'writer' },
-  { id: 'tester', label: 'QA Automation Tester', department: 'developer' },
-  { id: 'devops', label: 'Cloud & DevOps Engineer', department: 'developer' },
-  { id: 'planner', label: 'Technical Writer / Spec Lead', department: 'writer' },
-  { id: 'security', label: 'Security & Policy Auditor', department: 'writer' },
+  { id: 'researcher', label: 'Research Specialist & Knowledge Scout', department: 'orchestra' },
+  { id: 'frontend', label: 'Front End & UI/UX Engineer', department: 'developer' },
+  { id: 'backend', label: 'Back End & API Engineer', department: 'developer' },
+  { id: 'qa', label: 'QA Automation & Security Scanner', department: 'writer' },
+  { id: 'intern', label: 'Git Safety & Docs Intern', department: 'writer' },
+  { id: 'reviewer', label: 'Code Reviewer & Quality Auditor', department: 'writer' },
 ];
 
 export const AgentSettingsTab: React.FC = () => {
@@ -338,24 +331,13 @@ export const AgentSettingsTab: React.FC = () => {
                       onChange={(e) => handleRoleChange(agent.id, e.target.value as AgentRole)}
                       className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 font-mono text-xs text-zinc-300 transition focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer"
                     >
-                      <optgroup label="Role Utama">
-                        <option value="product_manager">Product Manager (PM)</option>
-                        <option value="researcher">AI Research Specialist (Obsidian & Docs)</option>
-                        <option value="frontend">Front End Engineer</option>
-                        <option value="backend">Back End Engineer</option>
-                        <option value="qa">QA Automation & Security Scanner</option>
-                        <option value="intern">Software Engineer Intern (Git & PR)</option>
-                      </optgroup>
-                      <optgroup label="Role Spesialis Lainnya">
-                        <option value="strategist">Workforce Strategist</option>
-                        <option value="architect">Systems Architect</option>
-                        <option value="developer">Full-Stack Developer</option>
-                        <option value="reviewer">Code Reviewer & Quality</option>
-                        <option value="tester">QA Automation Tester</option>
-                        <option value="devops">Cloud & DevOps Engineer</option>
-                        <option value="planner">Technical Writer / Spec Lead</option>
-                        <option value="security">Security & Policy Auditor</option>
-                      </optgroup>
+                      <option value="product_manager">Product Manager (PM)</option>
+                      <option value="researcher">AI Research Specialist (Obsidian & Docs)</option>
+                      <option value="frontend">Front End & UI/UX Engineer</option>
+                      <option value="backend">Back End & API Engineer</option>
+                      <option value="qa">QA Automation & Security Scanner</option>
+                      <option value="intern">Software Engineer Intern (Git & PR)</option>
+                      <option value="reviewer">Code Reviewer & Quality Auditor</option>
                     </select>
                   </div>
 
