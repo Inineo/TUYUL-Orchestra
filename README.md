@@ -311,7 +311,86 @@ The virtual office features three distinct zones:
 - `backend/config.py` — reads from environment variables only ✅
 
 ### Git History Audit
-The repository's git history has been verified — no sensitive files were ever committed. A dedicated security commit (`835dff6`) enhanced `.gitignore` and removed any internal documents from tracking.
+## 🏛️ System Architecture
+
+TUYUL Orchestra implements a 5-stage pipeline connecting task ingestion, concurrent multi-agent code generation, multi-layer quality & security audits, safe Git branching, and IDE developer tools integration:
+
+```mermaid
+flowchart LR
+    classDef default fill:#ffffff,stroke:#000000,stroke-width:2px,color:#000000,font-family:Helvetica,font-size:14px;
+    classDef decision fill:#ffffff,stroke:#000000,stroke-width:2px,color:#000000,font-size:14px;
+    classDef terminal fill:#f3f4f6,stroke:#000000,stroke-width:2.5px,color:#000000,font-size:14px;
+    classDef bridge fill:#ffffff,stroke:#000000,stroke-width:2.5px,stroke-dasharray: 4 4,color:#000000,font-size:14px;
+
+    User(["👤 User / Dev"]):::terminal --> Input{"Input<br/>Mode"}:::decision
+
+    %% --- STAGE 1: INGESTION ---
+    subgraph S1 ["1. Task Ingestion & Planning"]
+        direction TB
+        Input -->|"Full Mission"| PM["🧠 Lead PM AI"]
+        PM -->|"SOP"| Vault[("Obsidian Vault")]
+        PM -->|"Compress"| Caveman["Caveman Compressor"]
+        Caveman -->|"Prompt"| Router["9Router Gateway"]
+        Router --> Subtasks["Decomposed Subtasks"]
+
+        Input -->|"Direct @tag"| FastAPI["⚡ Direct Injection API"]
+        FastAPI --> SingleTask["Direct Task (0 Token)"]
+    end
+
+    Subtasks --> Dispatcher{"Concurrent<br/>Dispatcher"}:::decision
+    SingleTask --> Dispatcher
+
+    %% --- STAGE 2: MULTI-AGENT ENGINE ---
+    subgraph S2 ["2. Concurrent Multi-Agent Engine"]
+        direction TB
+        Dispatcher -->|"Context"| Res["🔬 Researcher Agent"]
+        Dispatcher -->|"UI Code"| FE["💻 Frontend Agent"]
+        Dispatcher -->|"API Code"| BE["⚙️ Backend Agent"]
+        Res -.->|"Docs"| FE
+        Res -.->|"Docs"| BE
+        FE --> Artifacts["📦 Code Artifacts<br/>(/artifacts/*)"]
+        BE --> Artifacts
+    end
+
+    Artifacts --> QA["🛡️ QA / Strix Scanner"]
+
+    %% --- STAGE 3: AUDIT & SAFETY GATE ---
+    subgraph S3 ["3. Audit & Safety Gate"]
+        direction TB
+        QA --> QACheck{"QA<br/>Pass?"}:::decision
+        QACheck -->|"Issues"| Dispatcher
+        QACheck -->|"Clean"| Rev["🔍 Reviewer AI"]
+        Rev --> RevCheck{"Approve?"}:::decision
+        RevCheck -->|"Reject"| Dispatcher
+        RevCheck -->|"Approved"| Safety["🔐 Smart Sensitivity Gate"]
+    end
+
+    Safety --> LeakCheck{"Safe to<br/>Publish?"}:::decision
+
+    %% --- STAGE 4: GIT LIFECYCLE ---
+    subgraph S4 ["4. Git Lifecycle"]
+        direction TB
+        LeakCheck -->|"Sensitive"| OfflineDocs[("Offline Vault<br/>antigravity/")]
+        LeakCheck -->|"Clean"| Branch["Create Branch<br/>intern/mission-*"]
+        Branch --> PR["🚀 GitHub Pull Request"]
+        Branch --> SSE["📡 Real-Time SSE"]
+    end
+
+    PR --> DevBridge["⚡ Workspace Bridge<br/>(Git Worktree & IDE Context)"]:::bridge
+    OfflineDocs -.->|"Sync Docs"| DevBridge
+    Artifacts -.->|"Inject Code"| DevBridge
+
+    %% --- STAGE 5: AGENTIC AI IDE / DEVELOPER TOOLS ---
+    subgraph S5 ["5. Agentic AI IDE / Developer Tools Integration"]
+        direction TB
+        DevBridge --> AIAssistant["🤖 Agentic AI IDE / Developer Tools<br/>(Antigravity, Claude Code, Codex, Cursor)"]
+        AIAssistant --> PromotionGate["Production Promotion Gate<br/>(/api/intern/merge-to-main)"]
+        PromotionGate --> MainBranch["Main Branch (Merged)"]
+    end
+
+    MainBranch --> Ready(["✨ Production Ready"]):::terminal
+    SSE --> Kanban["🖥️ Live Kanban Dashboard"]:::terminal
+```
 
 ---
 
