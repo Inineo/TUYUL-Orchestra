@@ -9,7 +9,7 @@ class ObsidianService:
     r"""
     Obsidian Vault Service
     Menyimpan catatan hasil kerja agen langsung ke folder:
-    D:\Obsidian\Obsidian Memories\antigravity\<CURRENT_PROJECT_NAME>\
+    <OBSIDIAN_VAULT_PATH>/<CURRENT_PROJECT_NAME>/
         ├── plan\
         ├── conversation\
         └── docs\
