@@ -313,84 +313,42 @@ The virtual office features three distinct zones:
 ### Git History Audit
 ## 🏛️ System Architecture
 
-TUYUL Orchestra implements a 5-stage pipeline connecting task ingestion, concurrent multi-agent code generation, multi-layer quality & security audits, safe Git branching, and IDE developer tools integration:
+<div align="center">
+  <a href="docs/architecture-diagram.svg">
+    <img src="docs/architecture-diagram.svg" alt="TUYUL Orchestra System Architecture Diagram" width="100%" style="border-radius: 8px; border: 1px solid #30363d; box-shadow: 0 8px 24px rgba(0,0,0,0.12);" />
+  </a>
+  <p><em>(Klik gambar di atas untuk membuka visual SVG high-definition skala penuh 1920×1080)</em></p>
+</div>
 
-```mermaid
-flowchart LR
-    classDef default fill:#ffffff,stroke:#000000,stroke-width:2px,color:#000000,font-family:Helvetica,font-size:14px;
-    classDef decision fill:#ffffff,stroke:#000000,stroke-width:2px,color:#000000,font-size:14px;
-    classDef terminal fill:#f3f4f6,stroke:#000000,stroke-width:2.5px,color:#000000,font-size:14px;
-    classDef bridge fill:#ffffff,stroke:#000000,stroke-width:2.5px,stroke-dasharray: 4 4,color:#000000,font-size:14px;
+<details>
+<summary><b>🔍 Rincian 5-Stage Pipeline Arsitektur</b></summary>
 
-    User(["👤 User / Dev"]):::terminal --> Input{"Input<br/>Mode"}:::decision
+1. **Stage 1: Task Ingestion & Planning**
+   - **Lead PM AI**: Membaca SOP dari Obsidian Vault lokal.
+   - **Caveman Compressor**: Memangkas token prompt hingga ~60% sebelum dikirim ke gateway.
+   - **9Router Gateway**: Orchestrasi failover ke pool 118+ model AI.
+   - **Direct Injection API**: Bypass 0-token untuk inject task langsung via `@tag`.
 
-    %% --- STAGE 1: INGESTION ---
-    subgraph S1 ["1. Task Ingestion & Planning"]
-        direction TB
-        Input -->|"Full Mission"| PM["🧠 Lead PM AI"]
-        PM -->|"SOP"| Vault[("Obsidian Vault")]
-        PM -->|"Compress"| Caveman["Caveman Compressor"]
-        Caveman -->|"Prompt"| Router["9Router Gateway"]
-        Router --> Subtasks["Decomposed Subtasks"]
+2. **Stage 2: Concurrent Multi-Agent Engine**
+   - **Concurrent Dispatcher**: Membagi subtask ke agent spesialis secara paralel.
+   - **Researcher Agent**: Ekstraksi dokumentasi dan context notes.
+   - **Frontend & Backend Agents**: Menulis kode dan menyimpan artefak ke `/artifacts/*`.
 
-        Input -->|"Direct @tag"| FastAPI["⚡ Direct Injection API"]
-        FastAPI --> SingleTask["Direct Task (0 Token)"]
-    end
+3. **Stage 3: Multi-Layer Audit & Safety Gate**
+   - **QA / Strix Scanner**: Security penetration testing & regression test otomatis.
+   - **Reviewer AI**: Verifikasi kesesuaian arsitektur & standar kode.
+   - **Smart Sensitivity Gate**: Mencegah kebocoran kredensial atau task privat ke GitHub publik.
 
-    Subtasks --> Dispatcher{"Concurrent<br/>Dispatcher"}:::decision
-    SingleTask --> Dispatcher
+4. **Stage 4: Git Lifecycle Delivery**
+   - **Offline Vault**: Menyimpan task sensitif secara terisolasi di Obsidian lokal.
+   - **Branching**: Pembuatan branch otomatis `intern/mission-*` dan GitHub PR.
+   - **Real-Time SSE**: Notifikasi live event stream ke Kanban dashboard.
 
-    %% --- STAGE 2: MULTI-AGENT ENGINE ---
-    subgraph S2 ["2. Concurrent Multi-Agent Engine"]
-        direction TB
-        Dispatcher -->|"Context"| Res["🔬 Researcher Agent"]
-        Dispatcher -->|"UI Code"| FE["💻 Frontend Agent"]
-        Dispatcher -->|"API Code"| BE["⚙️ Backend Agent"]
-        Res -.->|"Docs"| FE
-        Res -.->|"Docs"| BE
-        FE --> Artifacts["📦 Code Artifacts<br/>(/artifacts/*)"]
-        BE --> Artifacts
-    end
+5. **Stage 5: Agentic AI IDE / DevTools Integration**
+   - **Workspace Bridge**: Sinkronisasi Git worktree & artefak kode ke IDE agentic (Antigravity, Claude Code, Cursor, Codex).
+   - **Production Promotion Gate**: Verifikasi akhir sebelum merge ke branch `main`.
 
-    Artifacts --> QA["🛡️ QA / Strix Scanner"]
-
-    %% --- STAGE 3: AUDIT & SAFETY GATE ---
-    subgraph S3 ["3. Audit & Safety Gate"]
-        direction TB
-        QA --> QACheck{"QA<br/>Pass?"}:::decision
-        QACheck -->|"Issues"| Dispatcher
-        QACheck -->|"Clean"| Rev["🔍 Reviewer AI"]
-        Rev --> RevCheck{"Approve?"}:::decision
-        RevCheck -->|"Reject"| Dispatcher
-        RevCheck -->|"Approved"| Safety["🔐 Smart Sensitivity Gate"]
-    end
-
-    Safety --> LeakCheck{"Safe to<br/>Publish?"}:::decision
-
-    %% --- STAGE 4: GIT LIFECYCLE ---
-    subgraph S4 ["4. Git Lifecycle"]
-        direction TB
-        LeakCheck -->|"Sensitive"| OfflineDocs[("Offline Vault<br/>antigravity/")]
-        LeakCheck -->|"Clean"| Branch["Create Branch<br/>intern/mission-*"]
-        Branch --> PR["🚀 GitHub Pull Request"]
-        Branch --> SSE["📡 Real-Time SSE"]
-    end
-
-    PR --> DevBridge["⚡ Workspace Bridge<br/>(Git Worktree & IDE Context)"]:::bridge
-    OfflineDocs -.->|"Sync Docs"| DevBridge
-    Artifacts -.->|"Inject Code"| DevBridge
-
-    %% --- STAGE 5: AGENTIC AI IDE / DEVELOPER TOOLS ---
-    subgraph S5 ["5. Agentic AI IDE / Developer Tools Integration"]
-        direction TB
-        DevBridge --> AIAssistant["🤖 Agentic AI IDE / Developer Tools<br/>(Antigravity, Claude Code, Codex, Cursor)"]
-        AIAssistant --> PromotionGate["Production Promotion Gate<br/>(/api/intern/merge-to-main)"]
-        PromotionGate --> MainBranch["Main Branch (Merged)"]
-    end
-
-    MainBranch --> Ready(["✨ Production Ready"]):::terminal
-    SSE --> Kanban["🖥️ Live Kanban Dashboard"]:::terminal
-```
+</details>
 
 ---
 
