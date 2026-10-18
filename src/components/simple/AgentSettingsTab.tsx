@@ -18,6 +18,8 @@ import {
   Zap,
   RefreshCw,
   UserCheck,
+  X,
+  ChevronDown,
 } from 'lucide-react';
 
 // Preset Model dasar (Fallback bila 9Router belum online)
@@ -55,6 +57,8 @@ export const AgentSettingsTab: React.FC = () => {
   const [customModelInputs, setCustomModelInputs] = useState<Record<string, string>>({});
   const [availableModels, setAvailableModels] = useState<RouterModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [activeModelPickerAgentId, setActiveModelPickerAgentId] = useState<string | null>(null);
+  const [modelSearchQuery, setModelSearchQuery] = useState('');
 
   // Fetch all 9Router models on load
   const loadModels = async () => {
@@ -376,81 +380,20 @@ export const AgentSettingsTab: React.FC = () => {
                       </span>
                     </div>
 
-                    <select
-                      value={agent.model}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val !== '__custom__') {
-                          handleModelChange(agent.id, val);
-                        } else {
-                          setCustomModelInputs((prev) => ({
-                            ...prev,
-                            [agent.id]: agent.model,
-                          }));
-                        }
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveModelPickerAgentId(agent.id);
+                        setModelSearchQuery('');
                       }}
-                      className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 font-mono text-xs text-zinc-300 transition focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer"
+                      className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 font-mono text-xs text-zinc-200 transition hover:bg-zinc-800 hover:border-zinc-500 flex items-center justify-between cursor-pointer group"
                     >
-                      {/* 1. Kategori 9Router Smart Aliases */}
-                      <optgroup label="9Router Router Aliases (Direkomendasikan)">
-                        <option value="Daily">Daily — (Fast & Smart General)</option>
-                        <option value="Architect">Architect — (High Reasoning & Architecture)</option>
-                        <option value="Coding_Specialist">Coding_Specialist — (Code Generation & Refactor)</option>
-                        <option value="Reviewer">Reviewer — (Code Review & QA Validation)</option>
-                        <option value="Fast">Fast — (Ultra-low Latency Quick Tasks)</option>
-                        <option value="Reasoning">Reasoning — (Deep Reasoning & Logic Proofs)</option>
-                        <option value="Deep_Reviewer">Deep_Reviewer — (Deep Code Audits)</option>
-                        <option value="Opus">Opus — (Heavy Context / Synthesis)</option>
-                      </optgroup>
-
-                      {/* 2. Semua Model Aktif dari 9Router Gateway */}
-                      {availableModels.length > 0 ? (
-                        <>
-                          <optgroup label="Semua Model Aktif (9Router Gateway)">
-                            {availableModels
-                              .filter((m) => !['Daily', 'Architect', 'Coding_Specialist', 'Reviewer', 'Fast', 'Reasoning', 'Deep_Reviewer', 'Opus'].includes(m.id))
-                              .map((m) => (
-                                <option key={m.id} value={m.id}>
-                                  {m.id} {m.owned_by ? `[${m.owned_by}]` : ''}
-                                </option>
-                              ))}
-                          </optgroup>
-                        </>
-                      ) : (
-                        <optgroup label="Model Populer & Unggulan">
-                          {PRESET_MODELS.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.id} — ({m.provider})
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-
-                      <option value="__custom__">Custom Model Lainnya...</option>
-                    </select>
-
-                    {/* Custom Model String Input (if custom selected) */}
-                    {customModelInputs[agent.id] !== undefined && (
-                      <div className="mt-2">
-                        <input
-                          type="text"
-                          defaultValue={agent.model}
-                          placeholder="Ketik nama model custom..."
-                          onBlur={(e) => {
-                            const val = e.target.value.trim();
-                            if (val && val !== agent.model) {
-                              handleModelChange(agent.id, val);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.currentTarget.blur();
-                            }
-                          }}
-                          className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 transition focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
-                        />
+                      <span className="truncate font-medium">{agent.model}</span>
+                      <div className="flex items-center gap-1.5 text-zinc-400 group-hover:text-zinc-200 shrink-0">
+                        <Search className="h-3 w-3" />
+                        <span className="text-[10px] uppercase font-mono tracking-wider">PILIH</span>
                       </div>
-                    )}
+                    </button>
                   </div>
                 </div>
 
@@ -498,6 +441,187 @@ export const AgentSettingsTab: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* --- OPSI A: SEARCHABLE MODEL PICKER MODAL (SPOTLIGHT PALETTE) --- */}
+      {activeModelPickerAgentId && (() => {
+        const targetAgent = agents.find((a) => a.id === activeModelPickerAgentId);
+        if (!targetAgent) return null;
+
+        // Kumpulkan semua model (smart router aliases + 9router models)
+        const smartAliases = [
+          { id: 'Daily', provider: '9Router Alias', desc: 'Fast & Smart General (Daily Coding/Tasks)' },
+          { id: 'Architect', provider: '9Router Alias', desc: 'High Reasoning & Architecture Specs' },
+          { id: 'Coding_Specialist', provider: '9Router Alias', desc: 'Deep Code Generation & Refactor' },
+          { id: 'Reviewer', provider: '9Router Alias', desc: 'Code Review & QA Boundary Audits' },
+          { id: 'Fast', provider: '9Router Alias', desc: 'Ultra-low Latency Quick Operations' },
+          { id: 'Reasoning', provider: '9Router Alias', desc: 'Deep Math & Logic Proof Reasoning' },
+          { id: 'Deep_Reviewer', provider: '9Router Alias', desc: 'Heavy Exhaustive Security Audits' },
+          { id: 'Opus', provider: '9Router Alias', desc: 'High Context Synthesis' },
+        ];
+
+        // Format router models
+        const allDynamicModels = availableModels.length > 0
+          ? availableModels.map((m) => ({
+              id: m.id,
+              provider: m.owned_by ? m.owned_by.toUpperCase() : '9ROUTER',
+              desc: `Gateway Model ID: ${m.id}`,
+            }))
+          : PRESET_MODELS.map((p) => ({
+              id: p.id,
+              provider: p.provider.toUpperCase(),
+              desc: p.tier,
+            }));
+
+        const unifiedModels = [
+          ...smartAliases,
+          ...allDynamicModels.filter((m) => !smartAliases.some((s) => s.id.toLowerCase() === m.id.toLowerCase())),
+        ];
+
+        // Filter berdasarkan pencarian keyword
+        const query = modelSearchQuery.trim().toLowerCase();
+        const filteredList = unifiedModels.filter((m) =>
+          m.id.toLowerCase().includes(query) ||
+          m.provider.toLowerCase().includes(query) ||
+          m.desc.toLowerCase().includes(query)
+        );
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150 font-mono">
+            <div className="bg-zinc-950 border border-zinc-700 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col font-mono text-xs max-h-[85vh]">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shrink-0">
+                    <Search className="w-4 h-4 text-zinc-300" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-xs tracking-wide text-zinc-100 uppercase">
+                      Pilih Model AI — {targetAgent.name}
+                    </h2>
+                    <p className="mt-0.5 font-mono text-[11px] text-zinc-400">
+                      Model aktif saat ini: <span className="text-emerald-400 font-semibold">{targetAgent.model}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setActiveModelPickerAgentId(null)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Search Bar Input */}
+              <div className="p-4 border-b border-zinc-800 bg-zinc-900/50">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={modelSearchQuery}
+                    onChange={(e) => setModelSearchQuery(e.target.value)}
+                    placeholder="Cari model misal: claude, gemini, deepseek, gpt-4o, flash, qwen..."
+                    className="h-10 w-full rounded-xl border border-zinc-700 bg-zinc-950 pl-9 pr-4 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 transition focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  />
+                  {modelSearchQuery && (
+                    <button
+                      onClick={() => setModelSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-2 text-[10px] text-zinc-400 font-mono">
+                  <span>Ditemukan: <span className="text-zinc-200">{filteredList.length}</span> opsi</span>
+                  <span>{availableModels.length > 0 ? `${availableModels.length} Model Terkoneksi 9Router` : 'Fallback Mode'}</span>
+                </div>
+              </div>
+
+              {/* List of Models */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-1.5 max-h-[420px]">
+                {/* Fallback opsi jika query tidak ada di list: izinkan user menggunakan custom input */}
+                {query && !filteredList.some((m) => m.id.toLowerCase() === query) && (
+                  <button
+                    onClick={() => {
+                      handleModelChange(targetAgent.id, modelSearchQuery.trim());
+                      setActiveModelPickerAgentId(null);
+                    }}
+                    className="w-full p-3 rounded-xl border border-dashed border-emerald-700/60 bg-emerald-950/20 hover:bg-emerald-950/40 text-left transition flex items-center justify-between cursor-pointer group"
+                  >
+                    <div>
+                      <div className="text-xs font-semibold text-emerald-400 flex items-center gap-2">
+                        <span>Gunakan Custom Model String: "{modelSearchQuery.trim()}"</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">Terapkan nama model custom ini langsung ke {targetAgent.name}</p>
+                    </div>
+                    <span className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono">
+                      APPLY
+                    </span>
+                  </button>
+                )}
+
+                {filteredList.map((m) => {
+                  const isCurrent = targetAgent.model.toLowerCase() === m.id.toLowerCase();
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        handleModelChange(targetAgent.id, m.id);
+                        setActiveModelPickerAgentId(null);
+                      }}
+                      className={`w-full p-2.5 rounded-xl border text-left transition flex items-center justify-between cursor-pointer group ${
+                        isCurrent
+                          ? 'bg-zinc-100 text-zinc-950 border-zinc-200 shadow-sm'
+                          : 'bg-zinc-900/60 border-zinc-800 text-zinc-200 hover:bg-zinc-900 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1 pr-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-semibold text-xs truncate ${isCurrent ? 'text-zinc-950' : 'text-zinc-100'}`}>
+                            {m.id}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider shrink-0 ${
+                              isCurrent
+                                ? 'bg-zinc-300 text-zinc-900 font-bold'
+                                : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                            }`}
+                          >
+                            {m.provider}
+                          </span>
+                        </div>
+                        <p className={`text-[10px] mt-0.5 truncate ${isCurrent ? 'text-zinc-700' : 'text-zinc-400'}`}>
+                          {m.desc}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 flex items-center">
+                        {isCurrent ? (
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-800">
+                            <Check className="w-3.5 h-3.5" /> AKTIF
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300 font-mono">
+                            PILIH →
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {filteredList.length === 0 && !query && (
+                  <div className="py-12 text-center text-zinc-500">
+                    Tidak ada model tersedia.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
