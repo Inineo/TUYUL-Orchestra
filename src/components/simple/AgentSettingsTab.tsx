@@ -210,7 +210,7 @@ export const AgentSettingsTab: React.FC = () => {
               }`}
             >
               <Layers className="h-3.5 w-3.5" />
-              Orchestra (1)
+              Orchestra ({agents.filter((a) => a.department === 'orchestra').length})
             </button>
             <button
               onClick={() => setSelectedDept('developer')}
@@ -340,15 +340,17 @@ export const AgentSettingsTab: React.FC = () => {
                     >
                       <optgroup label="Role Utama">
                         <option value="product_manager">Product Manager (PM)</option>
+                        <option value="researcher">AI Research Specialist (Obsidian & Docs)</option>
                         <option value="frontend">Front End Engineer</option>
                         <option value="backend">Back End Engineer</option>
-                        <option value="intern">Software Engineer Intern</option>
+                        <option value="qa">QA Automation & Security Scanner</option>
+                        <option value="intern">Software Engineer Intern (Git & PR)</option>
                       </optgroup>
                       <optgroup label="Role Spesialis Lainnya">
                         <option value="strategist">Workforce Strategist</option>
                         <option value="architect">Systems Architect</option>
                         <option value="developer">Full-Stack Developer</option>
-                        <option value="reviewer">Code Reviewer & QA</option>
+                        <option value="reviewer">Code Reviewer & Quality</option>
                         <option value="tester">QA Automation Tester</option>
                         <option value="devops">Cloud & DevOps Engineer</option>
                         <option value="planner">Technical Writer / Spec Lead</option>
