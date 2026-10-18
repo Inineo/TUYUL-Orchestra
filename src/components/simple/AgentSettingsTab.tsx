@@ -165,8 +165,8 @@ export const AgentSettingsTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Presets & Refresh */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Refresh 9Router Models */}
+          <div className="flex items-center gap-2">
             <button
               onClick={loadModels}
               disabled={loadingModels}
@@ -175,35 +175,6 @@ export const AgentSettingsTab: React.FC = () => {
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loadingModels ? 'animate-spin' : ''}`} />
               <span>{availableModels.length > 0 ? `${availableModels.length} Model Aktif` : 'Sinkron 9Router'}</span>
-            </button>
-            <span className="text-[11px] text-zinc-500 font-mono uppercase tracking-wider mr-1 hidden lg:inline">
-              Preset:
-            </span>
-            <button
-              onClick={() => applyAllModelPreset('Daily', '9Router Daily')}
-              className="h-8 rounded-md border border-zinc-800 bg-zinc-950 px-2.5 font-mono text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 transition cursor-pointer"
-            >
-              Semua Daily
-            </button>
-            <button
-              onClick={() => applyAllModelPreset('Coding_Specialist', 'Coding Specialist')}
-              className="h-8 rounded-md border border-zinc-800 bg-zinc-950 px-2.5 font-mono text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 transition cursor-pointer"
-            >
-              Semua Coder
-            </button>
-            <button
-              onClick={() => applyAllModelPreset('gemini/gemini-3.7-flash', 'Gemini 3.7 Flash')}
-              className="h-8 rounded-md border border-zinc-800 bg-zinc-950 px-2.5 font-mono text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 transition cursor-pointer"
-            >
-              Gemini 3.7 Flash
-            </button>
-            <button
-              onClick={resetAllToDefaults}
-              className="h-8 rounded-md border border-zinc-800 bg-zinc-950 px-2.5 font-mono text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 transition flex items-center gap-1.5 cursor-pointer"
-              title="Kembalikan model ke default"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset
             </button>
           </div>
         </div>
