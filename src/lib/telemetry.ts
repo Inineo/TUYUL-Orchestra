@@ -1,58 +1,70 @@
 /**
- * Rekaman telemetri per-model dalam memori.
- * Ponytail: in-memory, hilang saat reload. Pindah ke backend/SQLite kalau butuh histori lintas sesi.
+ * Pengirim telemetri ke backend SQLite.
+ * Ponytail: fire-and-forget, gagal kirim tidak boleh merusak alur task.
+ * Riwayat dibaca lewat GET /api/backend/telemetry/summary.
  */
-export interface ModelStat {
-  model: string;
-  calls: number;
-  errors: number;
-  tokensIn: number;
-  tokensOut: number;
-  totalLatencyMs: number;
-  lastLatencyMs: number;
-  lastError?: string;
-}
-
-const stats = new Map<string, ModelStat>();
-const MAX_MODELS = 100;
-
-export function recordRouterCall(params: {
+export interface TelemetryEvent {
   model: string;
   latencyMs: number;
   promptTokens?: number;
   completionTokens?: number;
   error?: string;
-}): void {
-  const { model, latencyMs, promptTokens = 0, completionTokens = 0, error } = params;
-  let entry = stats.get(model);
-  if (!entry) {
-    if (stats.size >= MAX_MODELS) return;
-    entry = {
-      model,
-      calls: 0,
-      errors: 0,
-      tokensIn: 0,
-      tokensOut: 0,
-      totalLatencyMs: 0,
-      lastLatencyMs: 0,
-    };
-    stats.set(model, entry);
-  }
-  entry.calls += 1;
-  entry.totalLatencyMs += latencyMs;
-  entry.lastLatencyMs = Math.round(latencyMs);
-  entry.tokensIn += promptTokens;
-  entry.tokensOut += completionTokens;
-  if (error) {
-    entry.errors += 1;
-    entry.lastError = error.slice(0, 160);
+}
+
+export interface ModelSummary {
+  model: string;
+  calls: number;
+  errors: number;
+  tokens_in: number;
+  tokens_out: number;
+  avg_latency_ms: number;
+  last_seen: string;
+  last_error: string | null;
+}
+
+export interface TelemetrySummary {
+  window_hours: number;
+  models: ModelSummary[];
+  overall: {
+    total_events: number;
+    first_event: string | null;
+    last_event: string | null;
+  };
+}
+
+export function recordRouterCall(event: TelemetryEvent): void {
+  void fetch('/api/backend/telemetry/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: event.model,
+      latency_ms: Math.round(event.latencyMs),
+      prompt_tokens: event.promptTokens ?? 0,
+      completion_tokens: event.completionTokens ?? 0,
+      error: event.error ?? null,
+    }),
+  }).catch((err) => {
+    console.warn('Telemetry record failed:', err);
+  });
+}
+
+export async function fetchTelemetrySummary(hours = 24): Promise<TelemetrySummary | null> {
+  try {
+    const res = await fetch(`/api/backend/telemetry/summary?hours=${hours}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('Telemetry summary fetch failed:', err);
+    return null;
   }
 }
 
-export function getModelStats(): ModelStat[] {
-  return Array.from(stats.values()).sort((a, b) => b.calls - a.calls);
-}
-
-export function resetModelStats(): void {
-  stats.clear();
+export async function purgeTelemetry(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/backend/telemetry', { method: 'DELETE' });
+    return res.ok;
+  } catch (err) {
+    console.warn('Telemetry purge failed:', err);
+    return false;
+  }
 }

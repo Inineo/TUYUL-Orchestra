@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useOfficeStore } from '../../stores/useOfficeStore';
-import { getModelStats, resetModelStats, ModelStat } from '../../lib/telemetry';
+import { fetchTelemetrySummary, purgeTelemetry, ModelSummary } from '../../lib/telemetry';
 import {
   Activity,
   AlertTriangle,
@@ -36,15 +36,19 @@ export const StatsPanel: React.FC = () => {
   const { getStats, isLiveConnected } = useOfficeStore();
   const stats = getStats();
 
-  const [modelStats, setModelStats] = useState<ModelStat[]>([]);
+  const [modelStats, setModelStats] = useState<ModelSummary[]>([]);
   const [health, setHealth] = useState<GatewayHealth>({ ok: false, latencyMs: null, uptimeSeconds: null });
   const [checking, setChecking] = useState(false);
+  const [windowHours, setWindowHours] = useState(24);
 
   const refresh = useCallback(async () => {
-    setModelStats(getModelStats());
     setChecking(true);
     try {
-      const res = await fetch('/api/backend/health');
+      const [summary, res] = await Promise.all([
+        fetchTelemetrySummary(windowHours),
+        fetch('/api/backend/health'),
+      ]);
+      setModelStats(summary?.models ?? []);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setHealth({
@@ -62,7 +66,7 @@ export const StatsPanel: React.FC = () => {
     } finally {
       setChecking(false);
     }
-  }, []);
+  }, [windowHours]);
 
   useEffect(() => {
     refresh();
@@ -72,9 +76,10 @@ export const StatsPanel: React.FC = () => {
 
   const totalCalls = modelStats.reduce((acc, m) => acc + m.calls, 0);
   const totalErrors = modelStats.reduce((acc, m) => acc + m.errors, 0);
-  const totalTokens = modelStats.reduce((acc, m) => acc + m.tokensIn + m.tokensOut, 0);
-  const totalLatency = modelStats.reduce((acc, m) => acc + m.totalLatencyMs, 0);
-  const avgLatency = totalCalls > 0 ? Math.round(totalLatency / totalCalls) : 0;
+  const totalTokens = modelStats.reduce((acc, m) => acc + m.tokens_in + m.tokens_out, 0);
+  const avgLatency = totalCalls > 0
+    ? Math.round(modelStats.reduce((acc, m) => acc + m.avg_latency_ms * m.calls, 0) / totalCalls)
+    : 0;
 
   const summaryCards = [
     {
@@ -120,29 +125,51 @@ export const StatsPanel: React.FC = () => {
               Telemetri Sistem • Gateway &amp; Model Health
             </h2>
             <p className="mt-0.5 font-mono text-[11px] text-zinc-400">
-              Status konektivitas 9Router, latensi eksekusi per model, dan konsumsi token aktual sesi ini.
+              Status konektivitas 9Router, latensi per model, dan konsumsi token aktual. Riwayat tersimpan di SQLite.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-xl border border-zinc-700 bg-zinc-900 p-1">
+            {[
+              { hours: 1, label: '1j' },
+              { hours: 24, label: '24j' },
+              { hours: 168, label: '7h' },
+              { hours: 720, label: '30h' },
+            ].map((opt) => (
+              <button
+                key={opt.hours}
+                onClick={() => setWindowHours(opt.hours)}
+                className={`h-7 rounded-lg px-2.5 font-mono text-[11px] font-medium transition cursor-pointer ${
+                  windowHours === opt.hours
+                    ? 'bg-zinc-100 text-zinc-950 shadow-sm'
+                    : 'bg-zinc-950 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={refresh}
             disabled={checking}
             className="h-9 px-3 flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50 transition cursor-pointer"
-            title="Periksa ulang kesehatan gateway"
+            title="Muat ulang data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} />
             <span className="text-[11px] font-medium">Periksa</span>
           </button>
 
           <button
-            onClick={() => {
-              resetModelStats();
-              setModelStats([]);
+            onClick={async () => {
+              if (!window.confirm('Hapus seluruh riwayat telemetri? Tindakan ini tidak bisa dibatalkan.')) return;
+              await purgeTelemetry();
+              refresh();
             }}
             className="h-9 w-9 flex items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-rose-300 transition cursor-pointer"
-            title="Reset telemetri sesi"
+            title="Hapus seluruh riwayat telemetri"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -220,7 +247,7 @@ export const StatsPanel: React.FC = () => {
 
         {modelStats.length === 0 ? (
           <div className="text-center py-12 text-zinc-500 text-xs italic">
-            Belum ada request model pada sesi ini.
+            Belum ada data telemetri pada rentang {windowHours} jam terakhir.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -237,42 +264,39 @@ export const StatsPanel: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/80">
-                {modelStats.map((m) => {
-                  const avg = m.calls > 0 ? Math.round(m.totalLatencyMs / m.calls) : 0;
-                  return (
-                    <tr key={m.model} className="hover:bg-zinc-900/40 transition">
-                      <td className="px-4 py-3">
-                        <div className="text-[11px] text-zinc-200 truncate max-w-[22rem]" title={m.model}>
-                          {m.model}
+                {modelStats.map((m) => (
+                  <tr key={m.model} className="hover:bg-zinc-900/40 transition">
+                    <td className="px-4 py-3">
+                      <div className="text-[11px] text-zinc-200 truncate max-w-[22rem]" title={m.model}>
+                        {m.model}
+                      </div>
+                      {m.last_error && (
+                        <div className="mt-1 flex items-start gap-1 text-[10px] text-rose-400/80">
+                          <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                          <span className="truncate max-w-[22rem]" title={m.last_error}>
+                            {m.last_error}
+                          </span>
                         </div>
-                        {m.lastError && (
-                          <div className="mt-1 flex items-start gap-1 text-[10px] text-rose-400/80">
-                            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
-                            <span className="truncate max-w-[22rem]" title={m.lastError}>
-                              {m.lastError}
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[11px] text-zinc-200">{m.calls}</td>
-                      <td className={`px-4 py-3 text-right text-[11px] ${m.errors > 0 ? 'text-rose-300' : 'text-zinc-500'}`}>
-                        {m.errors}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[11px] text-zinc-400">
-                        {m.tokensIn.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[11px] text-zinc-400">
-                        {m.tokensOut.toLocaleString()}
-                      </td>
-                      <td className={`px-4 py-3 text-right text-[11px] ${avg > 3000 ? 'text-amber-300' : 'text-zinc-200'}`}>
-                        {avg} ms
-                      </td>
-                      <td className="px-4 py-3 text-right text-[11px] text-zinc-500">
-                        {m.lastLatencyMs} ms
-                      </td>
-                    </tr>
-                  );
-                })}
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-[11px] text-zinc-200">{m.calls}</td>
+                    <td className={`px-4 py-3 text-right text-[11px] ${m.errors > 0 ? 'text-rose-300' : 'text-zinc-500'}`}>
+                      {m.errors}
+                    </td>
+                    <td className="px-4 py-3 text-right text-[11px] text-zinc-400">
+                      {m.tokens_in.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-right text-[11px] text-zinc-400">
+                      {m.tokens_out.toLocaleString()}
+                    </td>
+                    <td className={`px-4 py-3 text-right text-[11px] ${m.avg_latency_ms > 3000 ? 'text-amber-300' : 'text-zinc-200'}`}>
+                      {m.avg_latency_ms} ms
+                    </td>
+                    <td className="px-4 py-3 text-right text-[10px] text-zinc-500">
+                      {new Date(m.last_seen + 'Z').toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

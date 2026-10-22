@@ -91,6 +91,21 @@ class Database:
             )
             """)
 
+            # 6. Tabel Telemetry Events (riwayat lintas sesi)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS telemetry_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model TEXT NOT NULL,
+                latency_ms REAL NOT NULL DEFAULT 0,
+                prompt_tokens INTEGER NOT NULL DEFAULT 0,
+                completion_tokens INTEGER NOT NULL DEFAULT 0,
+                error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_created ON telemetry_events (created_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_model ON telemetry_events (model)")
+
             conn.commit()
 
     # --- CRUD Missions ---
@@ -293,6 +308,75 @@ class Database:
             params.append(limit)
             cursor.execute(query, params)
             return [dict(r) for r in cursor.fetchall()]
+
+    # --- Telemetry (riwayat lintas sesi) ---
+    @classmethod
+    def record_telemetry(cls, model: str, latency_ms: float, prompt_tokens: int = 0,
+                         completion_tokens: int = 0, error: Optional[str] = None):
+        with cls.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO telemetry_events (model, latency_ms, prompt_tokens, completion_tokens, error)
+            VALUES (?, ?, ?, ?, ?)
+            """, (model, float(latency_ms), int(prompt_tokens), int(completion_tokens), error))
+            conn.commit()
+
+    @classmethod
+    def get_telemetry_summary(cls, hours: int = 24) -> Dict[str, Any]:
+        """Agregasi per model dalam N jam terakhir, plus total keseluruhan."""
+        with cls.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT model,
+                   COUNT(*)                          AS calls,
+                   SUM(CASE WHEN error IS NOT NULL THEN 1 ELSE 0 END) AS errors,
+                   SUM(prompt_tokens)                AS tokens_in,
+                   SUM(completion_tokens)            AS tokens_out,
+                   AVG(latency_ms)                   AS avg_latency_ms,
+                   MAX(created_at)                   AS last_seen
+            FROM telemetry_events
+            WHERE created_at >= datetime('now', ?)
+            GROUP BY model
+            ORDER BY calls DESC
+            """, (f"-{int(hours)} hours",))
+            models = [dict(r) for r in cursor.fetchall()]
+
+            # Error terakhir per model (query terpisah, hanya untuk model yang punya error)
+            for m in models:
+                m["avg_latency_ms"] = round(m["avg_latency_ms"] or 0)
+                if m["errors"]:
+                    cursor.execute("""
+                    SELECT error FROM telemetry_events
+                    WHERE model = ? AND error IS NOT NULL
+                    ORDER BY created_at DESC LIMIT 1
+                    """, (m["model"],))
+                    row = cursor.fetchone()
+                    m["last_error"] = row["error"] if row else None
+                else:
+                    m["last_error"] = None
+
+            cursor.execute("""
+            SELECT COUNT(*) AS total_events,
+                   MIN(created_at) AS first_event,
+                   MAX(created_at) AS last_event
+            FROM telemetry_events
+            """)
+            overall = dict(cursor.fetchone())
+
+            return {"window_hours": hours, "models": models, "overall": overall}
+
+    @classmethod
+    def purge_telemetry(cls, older_than_days: Optional[int] = None):
+        with cls.get_connection() as conn:
+            cursor = conn.cursor()
+            if older_than_days is None:
+                cursor.execute("DELETE FROM telemetry_events")
+            else:
+                cursor.execute("DELETE FROM telemetry_events WHERE created_at < datetime('now', ?)",
+                               (f"-{int(older_than_days)} days",))
+            deleted = cursor.rowcount
+            conn.commit()
+        return deleted
 
 # Inisialisasi DB saat modul di-load
 Database.init_db()

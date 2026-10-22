@@ -5,8 +5,8 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any, Set
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any, Set, Annotated
 from pathlib import Path
 
 from config import OBSIDIAN_VAULT_PATH, NINEROUTER_URL
@@ -127,6 +127,13 @@ class CreateProjectRequest(BaseModel):
     project_name: str
     description: Optional[str] = ""
 
+class TelemetryEventRequest(BaseModel):
+    model: Annotated[str, Field(min_length=1, max_length=200)]
+    latency_ms: Annotated[float, Field(ge=0, le=300_000)] = 0
+    prompt_tokens: Annotated[int, Field(ge=0, le=10_000_000)] = 0
+    completion_tokens: Annotated[int, Field(ge=0, le=10_000_000)] = 0
+    error: Optional[Annotated[str, Field(max_length=500)]] = None
+
 # --- Endpoints ---
 @app.get("/api/health")
 def health_check():
@@ -153,6 +160,32 @@ def health_check():
         "gateway_latency_ms": gateway_latency_ms,
         "uptime_seconds": round(time.time() - PROCESS_START_TS, 1),
     }
+
+@app.post("/api/telemetry/events")
+def record_telemetry_api(req: TelemetryEventRequest):
+    """Catat satu panggilan model ke SQLite agar riwayat bertahan lintas sesi."""
+    from services.database import Database
+    Database.record_telemetry(
+        model=req.model,
+        latency_ms=req.latency_ms,
+        prompt_tokens=req.prompt_tokens,
+        completion_tokens=req.completion_tokens,
+        error=req.error,
+    )
+    return {"success": True}
+
+@app.get("/api/telemetry/summary")
+def telemetry_summary_api(hours: int = 24):
+    """Agregat per model dalam N jam terakhir."""
+    from services.database import Database
+    return Database.get_telemetry_summary(hours=hours)
+
+@app.delete("/api/telemetry")
+def purge_telemetry_api(older_than_days: Optional[int] = None):
+    """Hapus seluruh riwayat telemetri, atau hanya yang lebih lama dari N hari."""
+    from services.database import Database
+    deleted = Database.purge_telemetry(older_than_days=older_than_days)
+    return {"success": True, "deleted": deleted}
 
 @app.post("/api/projects/init")
 def init_project_api(req: CreateProjectRequest):
