@@ -9,6 +9,7 @@ import { SimpleOfficeFloor } from './components/simple/SimpleOfficeFloor';
 import { SimpleKanban } from './components/simple/SimpleKanban';
 import { SimpleActivityFeed } from './components/simple/SimpleActivityFeed';
 import { AgentSettingsTab } from './components/simple/AgentSettingsTab';
+import { StatsPanel } from './components/panels/StatsPanel';
 import { AgentDetailModal } from './components/modals/AgentDetailModal';
 import { TaskDetailModal } from './components/modals/TaskDetailModal';
 import { CreateTaskModal } from './components/modals/CreateTaskModal';
@@ -112,6 +113,12 @@ export default function App() {
       {currentTab === 'grid2d' && (
         <div className="w-full h-full overflow-y-auto">
           <SimpleOfficeFloor />
+        </div>
+      )}
+
+      {currentTab === 'telemetry' && (
+        <div className="w-full h-full overflow-y-auto">
+          <StatsPanel />
         </div>
       )}
 

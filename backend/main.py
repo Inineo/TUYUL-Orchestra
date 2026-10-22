@@ -55,6 +55,9 @@ class EventBroadcaster:
 
 broadcaster = EventBroadcaster()
 
+import time as _time
+PROCESS_START_TS = _time.time()
+
 app = FastAPI(
     title="TUYUL Orchestra — Task Unified Yield & Utility Layer",
     version="1.0.0",
@@ -127,12 +130,28 @@ class CreateProjectRequest(BaseModel):
 # --- Endpoints ---
 @app.get("/api/health")
 def health_check():
+    import time
+    import requests as _requests
+
+    gateway_ok = False
+    gateway_latency_ms = None
+    start = time.perf_counter()
+    try:
+        res = _requests.get(f"{NINEROUTER_URL}/v1/models", timeout=2)
+        gateway_ok = res.ok
+    except Exception:
+        gateway_ok = False
+    gateway_latency_ms = round((time.perf_counter() - start) * 1000, 1)
+
     return {
         "status": "healthy",
         "service": "kibi-orchestra-python-backend",
         "obsidian_vault": str(OBSIDIAN_VAULT_PATH),
         "obsidian_exists": OBSIDIAN_VAULT_PATH.exists(),
-        "ninerouter_url": NINEROUTER_URL
+        "ninerouter_url": NINEROUTER_URL,
+        "gateway_ok": gateway_ok,
+        "gateway_latency_ms": gateway_latency_ms,
+        "uptime_seconds": round(time.time() - PROCESS_START_TS, 1),
     }
 
 @app.post("/api/projects/init")

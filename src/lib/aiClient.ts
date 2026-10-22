@@ -3,6 +3,8 @@
  * Menghubungkan Kibi Orchestra UI langsung ke Gateway 9Router (http://localhost:20128)
  */
 
+import { recordRouterCall } from './telemetry';
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -112,6 +114,7 @@ export async function call9RouterChat(
   const maxTokens = options.maxTokens ?? 1024;
 
   const url = '/api/9router/v1/chat/completions';
+  const startedAt = performance.now();
 
   try {
     const response = await fetch(url, {
@@ -141,6 +144,13 @@ export async function call9RouterChat(
       total_tokens: 0,
     };
 
+    recordRouterCall({
+      model: data.model || model,
+      latencyMs: performance.now() - startedAt,
+      promptTokens: usage.prompt_tokens,
+      completionTokens: usage.completion_tokens,
+    });
+
     return {
       content,
       model: data.model || model,
@@ -151,6 +161,11 @@ export async function call9RouterChat(
       },
     };
   } catch (error) {
+    recordRouterCall({
+      model,
+      latencyMs: performance.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error),
+    });
     console.error('9Router call failed:', error);
     throw error;
   }

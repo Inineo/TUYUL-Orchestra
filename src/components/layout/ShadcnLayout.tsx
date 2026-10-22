@@ -23,7 +23,7 @@ import {
   Cpu,
 } from 'lucide-react';
 
-export type DashboardTab = 'office3d' | 'kanban' | 'activity' | 'grid2d' | 'settings';
+export type DashboardTab = 'office3d' | 'kanban' | 'activity' | 'grid2d' | 'settings' | 'telemetry';
 
 interface ShadcnLayoutProps {
   currentTab: DashboardTab;
@@ -63,6 +63,7 @@ export const ShadcnLayout: React.FC<ShadcnLayoutProps> = ({
     { key: 'kanban' as const, label: 'Papan Tugas', icon: Kanban, desc: `${tasks.length} item antrean` },
     { key: 'activity' as const, label: 'Aktivitas', icon: Radio, desc: 'Live event stream' },
     { key: 'grid2d' as const, label: 'Meja 2D', icon: LayoutGrid, desc: '3 zona departemen' },
+    { key: 'telemetry' as const, label: 'Telemetri', icon: Activity, desc: 'Health gateway & latency model' },
   ];
 
   return (

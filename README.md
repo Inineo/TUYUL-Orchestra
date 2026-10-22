@@ -26,13 +26,15 @@
 **TUYUL Orchestra**: A full virtual office where specialized AI agents work together with hierarchy, authority levels, and escalation protocols
 
 Think of it as a **virtual software company** where:
-- 🎩 **Orchestra Maestro** — Makes strategic decisions (Authority: 10)
-- 🏗️ **Architects** — Design system architecture (Authority: 8)
-- 💻 **Developers** — Write code (Authority: 4–6)
-- 🔍 **QA Engineers** — Test and validate with AI security scanning (Authority: 3)
-- 📝 **Technical Writers** — Document everything (Authority: 2)
-- 🔬 **AI Research Specialist** — Provides PM with knowledge & research (Authority: 5)
-- 🎓 **Interns** — Create GitHub issues and assist (Authority: 1)
+- 🎩 **Product Manager** — Decomposes PRD, dispatches tasks, reviews output (Authority: 10)
+- 🔬 **AI Research Specialist** — Pulls context from Obsidian Vault to save PM tokens (Authority: 5)
+- 💻 **Frontend Engineer** — Builds UI components and consumes backend APIs (Authority: 4)
+- ⚙️ **Backend Engineer** — Owns REST API, schema, auth, and data logic (Authority: 4)
+- 🧪 **QA Engineer** — Regression testing + Strix security scanning (Authority: 3)
+- 👀 **Reviewer** — Architecture conformance and code standard audit (Authority: 6)
+- 🎓 **Intern** — Git safety SOP, docs, GitHub issues, Obsidian wikilinks (Authority: 1)
+
+> The workforce is deliberately pruned to **7 functional roles**. Non-functional roles (`architect`, `strategist`, `developer`, `devops`, `planner`, `security`) were removed in commit `8d2808f` — see [src/types/office.ts](src/types/office.ts).
 
 ---
 
@@ -78,9 +80,16 @@ Think of it as a **virtual software company** where:
 ### 🎛️ Real-time Orchestration
 - Live task board with Kanban-style workflow
 - Activity feed showing only task-relevant events (no noise)
-- Agent status monitoring (Idle, Planning, Coding, Testing, Reviewing, Researching)
+- Agent status monitoring (Idle, Planning, Coding, Testing, Reviewing, Blocked)
 - Mission progress tracking
 - Cost optimization through smart model routing via 9Router
+
+### 📡 Observability & Health Telemetry
+- Dedicated **Telemetri** tab showing live gateway health, not a static assumption
+- `/api/health` actually pings `9Router /v1/models` and reports `gateway_ok`, `gateway_latency_ms`, and backend `uptime_seconds`
+- Per-model table: call count, failures, real token in/out from the API response `usage` field, average and last latency
+- SSE stream state surfaced separately from gateway state, so a dead gateway can no longer hide behind a green "SSE LIVE" badge
+- In-memory session stats with a manual reset; no external metrics service required
 
 ### 🔄 Backend Integration
 - **FastAPI** backend for AI orchestration
@@ -182,7 +191,7 @@ gh auth login
 ```bash
 npm run dev
 ```
-Open http://localhost:5173
+Open http://localhost:3000
 
 **Backend** (database auto-initializes on first run):
 ```bash
@@ -229,9 +238,9 @@ Kibi-Orchestra-V3/
 │   │   ├── office3d/           # 3D office scene components
 │   │   │   ├── ThreeOfficeScene.ts  # Main 3D engine
 │   │   │   └── OfficeCanvas.tsx     # React wrapper
-│   │   ├── panels/             # UI panels (TaskBoard, Stats, Events)
+│   │   ├── panels/             # Telemetry dashboard (StatsPanel)
 │   │   ├── modals/             # Modal dialogs
-│   │   ├── simple/             # Simple UI components (ActivityFeed, AgentSettings)
+│   │   ├── simple/             # Simple UI components (Kanban, ActivityFeed, AgentSettings)
 │   │   └── ui/                 # Reusable UI primitives
 │   ├── stores/
 │   │   └── useOfficeStore.ts   # Zustand global state + agent simulation
@@ -241,7 +250,8 @@ Kibi-Orchestra-V3/
 │   │   └── initialData.ts      # Default agent configurations
 │   └── lib/
 │       ├── utils.ts            # Utility functions
-│       └── aiClient.ts         # AI client integration (9Router)
+│       ├── aiClient.ts         # AI client integration (9Router) + call instrumentation
+│       └── telemetry.ts        # In-memory per-model stats (calls, errors, tokens, latency)
 ├── backend/
 │   ├── main.py                 # FastAPI server (all routes)
 │   ├── config.py               # Configuration management
@@ -283,16 +293,15 @@ The virtual office features three distinct zones:
 
 ## 🧠 Agent Roles & Authority
 
-| Role | Authority | Model Policy | Responsibilities |
-|------|-----------|--------------|------------------|
-| **Orchestra Maestro** | 10 | Premium (Claude-3.5) | Strategic decisions, final approval |
-| **System Architect** | 8 | Premium (Claude-3.5) | Architecture design, locked decisions |
-| **Senior Developer** | 6 | Dynamic | Complex implementations |
-| **AI Research Specialist** | 5 | Standard | Knowledge retrieval, Obsidian search, research support |
-| **Developer** | 4 | Budget (DeepSeek) | Standard coding tasks |
-| **QA Engineer** | 3 | Standard + Strix | Testing, validation & security scanning |
-| **Technical Writer** | 2 | Budget (Gemini-Flash) | Documentation |
-| **Intern** | 1 | Budget | GitHub issue creation, learning & assistance |
+| Role (code) | Authority | Default Model | Responsibilities |
+|-------------|-----------|---------------|------------------|
+| **Product Manager** (`product_manager`) | 10 | `Architect` | PRD decomposition, dispatch, review gate, final approval |
+| **Reviewer** (`reviewer`) | 6 | `Coding_Specialist` | Architecture conformance, code standard audit |
+| **AI Research Specialist** (`researcher`) | 5 | `Fast` | Knowledge retrieval, Obsidian search, PM context support |
+| **Frontend Engineer** (`frontend`) | 4 | `Daily` | UI components, responsiveness, API consumption |
+| **Backend Engineer** (`backend`) | 4 | `Coding_Specialist` | REST API, schema, auth, data logic |
+| **QA Engineer** (`qa`) | 3 | `Tester` + Strix | Regression testing, edge cases, security scan |
+| **Intern** (`intern`) | 1 | `Fast` | Git safety SOP, docs, GitHub issues, Obsidian wikilinks |
 
 **Key Principle**: Lower authority cannot override higher authority decisions — they must escalate!
 
@@ -372,26 +381,38 @@ graph TD
 
 ## 🔧 Backend API Endpoints
 
-### Mission Management
-- `POST /api/mission/start` — Start a new mission
-- `GET /api/mission/{id}/status` — Check mission status
-- `POST /api/mission/{id}/abort` — Abort mission
+### System & Events
+- `GET /api/health` — Live gateway ping, latency, uptime
+- `GET /api/events/stream` — SSE event bridge (task + PR lifecycle)
 
-### Agent Operations
-- `POST /api/agent/{role}/assign` — Assign task to agent
-- `GET /api/agent/{role}/status` — Get agent status
-- `POST /api/agent/{role}/escalate` — Escalate to higher authority
+### Mission & Task Management
+- `POST /api/missions/decompose` — PM breaks a goal into subtasks
+- `POST /api/missions/review` — PM review gate
+- `GET /api/missions` / `GET /api/missions/{mission_id}` — Mission records
+- `POST /api/tasks` — Hybrid single-ticket dispatch (bypasses PM, 0 extra PM tokens)
+- `GET /api/tasks` — List tasks
+- `PATCH /api/tasks/{task_id}/status` — Update task status
+- `POST /api/tasks/{task_id}/complete` — Complete task + persist artifact
 
-### GitHub Issue Management
+### Agent & Memory
+- `POST /api/agents` / `GET /api/agents` — Agent registry
+- `GET /api/agents/{agent_id}/memory` — Task history + artifact summary
+- `POST /api/artifacts` — Save artifact
+- `GET /api/artifacts/task/{task_id}` / `GET /api/artifacts/mission/{mission_id}` — Artifact lookup
+
+### Git Lifecycle (Intern)
 - `POST /api/intern/github-issue` — Create GitHub issue via `gh` CLI
+- `POST /api/intern/missions/{mission_id}/commit-and-push` — Commit + push on mission branch
+- `POST /api/intern/missions/{mission_id}/create-pr` — Open PR with security gate
+- `POST /api/intern/missions/{mission_id}/merge-to-main` — Guarded promotion to `main`
 
 ### QA & Security
 - `POST /api/qa/strix-scan` — Run Strix autonomous security scan
 
 ### Obsidian Integration
-- `POST /api/obsidian/sync-docs` — Sync documentation to vault
-- `POST /api/obsidian/create-index` — Generate index notes
-- `POST /api/obsidian/create-sop` — Create SOPs
+- `GET /api/obsidian/notes` / `GET /api/obsidian/notes/{filename}` — Read notes
+- `POST /api/obsidian/notes` — Write note
+- `POST /api/projects/init` — Scaffold project folders (`plan/`, `conversation/`, `docs/`)
 
 ---
 
@@ -430,11 +451,19 @@ graph TD
 - [x] Activity feed filtering (clean, task-focused logs)
 - [x] Backend reorganization (modular services architecture)
 
-### Phase 3: Scale 🚧 (In Progress)
-- [ ] Memory system for agents (persistent context across missions)
-- [ ] Parallel task execution (multiple missions simultaneously)
-- [ ] Advanced cost prediction engine
-- [ ] Custom workflow templates
+### Phase 3: Scale ✅ (Delivered)
+- [x] Memory system for agents (persistent context across missions)
+- [x] Parallel subtask execution (concurrent multi-agent engine)
+- [x] 9Router cost prediction & token estimator
+- [x] Custom workflow templates (1-click presets + custom save to localStorage)
+- [x] Hybrid single-ticket dispatch (bypass PM with `@tag`)
+- [x] Git branch & PR lifecycle automation (guarded promotion to `main`)
+- [x] Real-time SSE event bridge
+- [x] Observability & health telemetry
+
+### Phase 4: Next 🚧
+- [ ] Interactive onboarding / setup wizard (`python scripts/setup.py`)
+- [ ] Persistent telemetry history (currently session-only, in-memory)
 - [ ] Multi-mission support
 - [ ] Team collaboration features
 - [ ] Production deployment & cloud hosting
