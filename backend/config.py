@@ -23,7 +23,9 @@ OBSIDIAN_VAULT_PATH = Path(os.getenv("OBSIDIAN_ANTIGRAVITY_PATH", DEFAULT_OBSIDI
 
 # Project Subfolder Configuration
 CURRENT_PROJECT_NAME = os.getenv("CURRENT_PROJECT_NAME", "Kibi-Orchestra")
-PROJECT_VAULT_PATH = OBSIDIAN_VAULT_PATH / CURRENT_PROJECT_NAME
+# Mendukung override manual lokasi folder (misal: saat nama project di-rename namun tetap menunjuk ke vault lama)
+custom_proj_path = os.getenv("OBSIDIAN_PROJECT_PATH")
+PROJECT_VAULT_PATH = Path(custom_proj_path) if custom_proj_path else (OBSIDIAN_VAULT_PATH / CURRENT_PROJECT_NAME)
 
 # Ensure the directories exist safely without breaking backend if path is inaccessible
 try:

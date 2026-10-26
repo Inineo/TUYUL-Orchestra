@@ -17,7 +17,12 @@ class ObsidianService:
 
     def __init__(self, project_path: Optional[Path] = None, project_name: Optional[str] = None):
         self.project_name = project_name or CURRENT_PROJECT_NAME
-        self.project_path = project_path or (OBSIDIAN_VAULT_PATH / self.project_name)
+        if project_path:
+            self.project_path = project_path
+        elif project_name and project_name != CURRENT_PROJECT_NAME:
+            self.project_path = OBSIDIAN_VAULT_PATH / project_name
+        else:
+            self.project_path = PROJECT_VAULT_PATH
         self.plan_path = self.project_path / "plan"
         self.conversation_path = self.project_path / "conversation"
         self.docs_path = self.project_path / "docs"

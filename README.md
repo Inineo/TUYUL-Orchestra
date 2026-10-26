@@ -173,10 +173,16 @@ VITE_9ROUTER_API_KEY=your_api_key_here
 # Default AI Model (routed via 9Router)
 DEFAULT_AI_MODEL=openai/gpt-4o-mini
 
-# Obsidian Integration (optional but recommended)
+# Obsidian Integration (optional, AI Experience & Knowledge Base)
 OBSIDIAN_ANTIGRAVITY_PATH=D:\Obsidian\YourVault\antigravity
 CURRENT_PROJECT_NAME=Kibi-Orchestra
+
+# Project Renaming / Vault Alias (Opsional)
+# Jika nama project diganti namun Anda ingin AI tetap membaca dokumentasi & memory dari folder lama:
+# OBSIDIAN_PROJECT_PATH=D:\Obsidian\YourVault\antigravity\Nama-Project-Lama
 ```
+
+> 💡 **Project Renaming Tip**: Jika Anda mengganti `CURRENT_PROJECT_NAME=Project-Baru`, Anda tidak perlu me-rename folder secara fisik di Obsidian. Cukup set `OBSIDIAN_PROJECT_PATH=<path-ke-folder-lama>` di `.env`, maka seluruh agen AI (Researcher, Frontend, Backend) tetap dapat membaca seluruh riwayat fitur dan solusi bug sebelumnya.
 
 > ⚠️ **Never commit your `.env` file.** It is already in `.gitignore`. Only `.env.example` (with empty values) is tracked.
 
