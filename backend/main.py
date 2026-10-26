@@ -424,6 +424,56 @@ def create_github_issue_api(req: CreateIssueRequest):
     )
     return res
 
+@app.get("/api/intern/prs/{pr_number}/checks")
+def get_pr_checks_api(pr_number: str):
+    """
+    Mengambil status pengujian CI/CD (GitHub Actions) untuk PR tertentu.
+    Digunakan oleh dashboard Kibi Orchestra untuk menampilkan indikator hijau/merah.
+    """
+    from services.intern_safety import InternGitSafetyService
+    from pathlib import Path
+    
+    repo_root = Path(__file__).resolve().parent.parent
+    intern_service = InternGitSafetyService(repo_root)
+    return intern_service.get_pr_checks(pr_number)
+
+class MergePRRequest(BaseModel):
+    merge_method: Optional[str] = "squash"
+
+@app.post("/api/intern/prs/{pr_number}/merge")
+def merge_pr_api(pr_number: str, req: Optional[MergePRRequest] = None):
+    """
+    Eksekusi merge PR ke main setelah disetujui (Approved) oleh User / Antigravity Interactive Gate.
+    """
+    from services.intern_safety import InternGitSafetyService
+    from pathlib import Path
+    
+    repo_root = Path(__file__).resolve().parent.parent
+    intern_service = InternGitSafetyService(repo_root)
+    method = req.merge_method if req else "squash"
+    res = intern_service.merge_pull_request(pr_number, merge_method=method)
+
+    if res.get("success"):
+        broadcaster.broadcast_sync("pr_merged", {
+            "pr_number": pr_number,
+            "message": f"PR #{pr_number} berhasil di-merge ke main."
+        })
+
+    return res
+
+@app.post("/api/intern/generate-ci-workflow")
+def generate_ci_workflow_api(overwrite: bool = False):
+    """
+    Tugas AI Intern: Membuat file .github/workflows/ci-cd.yml otomatis.
+    """
+    from services.intern_safety import InternGitSafetyService
+    from pathlib import Path
+    
+    repo_root = Path(__file__).resolve().parent.parent
+    intern_service = InternGitSafetyService(repo_root)
+    res = intern_service.generate_ci_workflow(overwrite=overwrite)
+    return res
+
 class QAScanRequest(BaseModel):
     model: Optional[str] = None
     target_path: Optional[str] = None

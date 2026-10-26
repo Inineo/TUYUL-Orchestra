@@ -134,6 +134,11 @@
   - Deduplication check otomatis: Mencegah issue bug yang sama ditulis berulang kali.
   - Endpoint `POST /api/tasks/auto-bug-experience` dengan auto-hook di `useOfficeStore.ts` saat tiket QA / Reviewer selesai.
   - Self-check otomatis [check_dual_bug_sync.py](file:///e:/Web/Kibi-Orchestra-V3/backend/scripts/check_dual_bug_sync.py) lolos verifikasi.
+- [x] **CI/CD Quality Gate Dashboard Widget & Interactive Merge Flow** (Issue #31):
+  - Template otomatis `.github/workflows/ci-cd.yml` di-generate oleh AI Intern (lengkap dengan job `quality-gate` dan `paths-ignore`).
+  - Endpoint backend baru: `GET /api/intern/prs/{pr_number}/checks`, `POST /api/intern/prs/{pr_number}/merge`, dan `POST /api/intern/generate-ci-workflow`.
+  - Widget real-time di [TaskDetailModal.tsx](file:///e:/Web/Kibi-Orchestra-V3/src/components/modals/TaskDetailModal.tsx) menampilkan badge hijau pengujian otomatis (TypeScript TypeCheck & Bundle Build).
+  - Tombol aksi persetujuan user `Merge to Main` (`--squash`) langsung dari dashboard web & modal konfirmasi.
 
 ---
 

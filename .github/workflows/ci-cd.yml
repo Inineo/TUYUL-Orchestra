@@ -1,0 +1,57 @@
+name: Kibi Orchestra CI/CD Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+jobs:
+  # 1. CI: Pemeriksaan Mutu (Hanya menguji kodingan, 0% menyentuh database production)
+  quality-gate:
+    name: Type & Build Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: TypeScript Type Safety Check
+        run: npx tsc --noEmit
+
+      - name: Production Bundle Build Verification
+        run: npm run build
+
+  # 2. CD: Penerapan Rilis (Hanya berjalan di branch main setelah Pull Request di-merge)
+  deploy-and-release:
+    name: Deploy & Release Stage
+    needs: quality-gate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Notification
+        run: |
+          echo "Quality Gate PASSED. Ready for automatic cloud deployment."
+          # Masukkan perintah migrasi database Anda di sini jika menggunakan Supabase/PostgreSQL:
+          # npx prisma migrate deploy
+          # env:
+          #   DATABASE_URL: ${{ secrets.DATABASE_URL }}

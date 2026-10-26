@@ -435,3 +435,178 @@ class InternGitSafetyService:
             "message": "GitHub CLI (`gh`) tidak ditemukan untuk eksekusi pembuatan PR."
         }
 
+    def get_pr_checks(self, pr_number: str) -> Dict[str, Any]:
+        """
+        AI Intern: Mengambil status pengujian CI/CD (GitHub Actions) untuk PR tertentu.
+        Mengembalikan daftar checks (nama job, status, kesimpulan hijau/merah).
+        """
+        import os
+        import json
+        import shutil
+        import subprocess
+
+        gh_path = shutil.which("gh") or r"C:\Program Files\GitHub CLI\gh.exe"
+        if not (os.path.exists(gh_path) or shutil.which("gh")):
+            return {"success": False, "message": "GitHub CLI (`gh`) tidak terpasang."}
+
+        repo = "Inineo/TUYUL-Orchestra"
+        clean_num = str(pr_number).replace("#", "").strip()
+
+        try:
+            cmd = [
+                gh_path, "pr", "checks", clean_num,
+                "--repo", repo,
+                "--json", "name,state,bucket,description,link"
+            ]
+            res = subprocess.run(cmd, cwd=str(self.repo_root), capture_output=True, text=True, timeout=20)
+            
+            if res.returncode == 0:
+                checks = json.loads(res.stdout) if res.stdout.strip() else []
+                all_passed = len(checks) > 0 and all(c.get("bucket") == "pass" for c in checks)
+                has_failure = any(c.get("bucket") == "fail" for c in checks)
+                is_pending = any(c.get("bucket") == "pending" for c in checks)
+                
+                return {
+                    "success": True,
+                    "pr_number": clean_num,
+                    "all_passed": all_passed,
+                    "has_failure": has_failure,
+                    "is_pending": is_pending,
+                    "checks": checks,
+                    "summary": f"{len([c for c in checks if c.get('bucket') == 'pass'])}/{len(checks)} checks passed" if checks else "No checks reported yet"
+                }
+            else:
+                stderr = res.stderr.strip()
+                # Jika belum ada workflow run
+                if "no checks reported" in stderr.lower() or "no commit found" in stderr.lower():
+                    return {
+                        "success": True,
+                        "pr_number": clean_num,
+                        "all_passed": False,
+                        "is_pending": False,
+                        "checks": [],
+                        "summary": "Belum ada GitHub Actions workflow checks yang terdaftar untuk PR ini."
+                    }
+                return {"success": False, "message": f"Gagal membaca checks via gh: {stderr}"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def merge_pull_request(self, pr_number: str, merge_method: str = "squash") -> Dict[str, Any]:
+        """
+        AI Intern: Melakukan merge PR ke main setelah disetujui oleh User/Antigravity Gate.
+        """
+        import os
+        import shutil
+        import subprocess
+
+        gh_path = shutil.which("gh") or r"C:\Program Files\GitHub CLI\gh.exe"
+        if not (os.path.exists(gh_path) or shutil.which("gh")):
+            return {"success": False, "message": "GitHub CLI (`gh`) tidak terpasang."}
+
+        repo = "Inineo/TUYUL-Orchestra"
+        clean_num = str(pr_number).replace("#", "").strip()
+
+        try:
+            cmd = [
+                gh_path, "pr", "merge", clean_num,
+                "--repo", repo,
+                f"--{merge_method}",
+                "--delete-branch"
+            ]
+            res = subprocess.run(cmd, cwd=str(self.repo_root), capture_output=True, text=True, timeout=30)
+            if res.returncode == 0:
+                return {
+                    "success": True,
+                    "pr_number": clean_num,
+                    "merged": True,
+                    "message": f"Pull Request #{clean_num} berhasil di-merge ke branch main ({merge_method})."
+                }
+            else:
+                return {"success": False, "message": f"Gagal merge PR: {res.stderr.strip()}"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def generate_ci_workflow(self, overwrite: bool = False) -> Dict[str, Any]:
+        """
+        AI Intern: Membuat file workflow GitHub Actions CI/CD (.github/workflows/ci-cd.yml).
+        """
+        workflow_dir = self.repo_root / ".github" / "workflows"
+        workflow_dir.mkdir(parents=True, exist_ok=True)
+        workflow_file = workflow_dir / "ci-cd.yml"
+
+        if workflow_file.exists() and not overwrite:
+            return {
+                "success": True,
+                "created": False,
+                "file_path": str(workflow_file),
+                "message": "File workflow .github/workflows/ci-cd.yml sudah ada."
+            }
+
+        yaml_content = """name: Kibi Orchestra CI/CD Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+jobs:
+  # 1. CI: Pemeriksaan Mutu (Hanya menguji kodingan, 0% menyentuh database production)
+  quality-gate:
+    name: Type & Build Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: TypeScript Type Safety Check
+        run: npx tsc --noEmit
+
+      - name: Production Bundle Build Verification
+        run: npm run build
+
+  # 2. CD: Penerapan Rilis (Hanya berjalan di branch main setelah Pull Request di-merge)
+  deploy-and-release:
+    name: Deploy & Release Stage
+    needs: quality-gate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Notification
+        run: |
+          echo "Quality Gate PASSED. Ready for automatic cloud deployment."
+          # Masukkan perintah migrasi database Anda di sini jika menggunakan Supabase/PostgreSQL:
+          # npx prisma migrate deploy
+          # env:
+          #   DATABASE_URL: ${{ secrets.DATABASE_URL }}
+"""
+        with open(workflow_file, "w", encoding="utf-8") as f:
+            f.write(yaml_content.strip() + "\n")
+
+        return {
+            "success": True,
+            "created": True,
+            "file_path": str(workflow_file),
+            "message": "File .github/workflows/ci-cd.yml berhasil dibuat oleh AI Intern."
+        }
+
