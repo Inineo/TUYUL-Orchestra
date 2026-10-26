@@ -123,10 +123,12 @@ export const AgentSettingsTab: React.FC = () => {
     agents.forEach((ag) => {
       let defaultModel = 'Daily';
       if (ag.role === 'product_manager' || ag.department === 'orchestra') defaultModel = 'Architect';
-      else if (ag.role === 'backend' || ag.role === 'developer') defaultModel = 'Coding_Specialist';
+      else if (ag.role === 'backend') defaultModel = 'Coding_Specialist';
       else if (ag.role === 'frontend') defaultModel = 'Daily';
-      else if (ag.role === 'intern' || ag.role === 'tester' || ag.role === 'devops') defaultModel = 'Fast';
+      else if (ag.role === 'intern') defaultModel = 'Fast';
+      else if (ag.role === 'qa') defaultModel = 'Daily';
       else if (ag.role === 'reviewer') defaultModel = 'Reviewer';
+      else if (ag.role === 'researcher') defaultModel = 'Architect';
 
       updateAgent(ag.id, { model: defaultModel });
     });

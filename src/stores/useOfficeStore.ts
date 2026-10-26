@@ -522,9 +522,9 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
         if (associatedTask) {
           if (newProgress >= 100) {
             taskCompleted = true;
-            // Workflow handoff: if developer finished, send to review!
+            // Workflow handoff: if developer (frontend/backend) finished, send to review!
             const nextStatus: TaskStatus =
-              luckyAgent.role === 'developer' ? 'review' : 'done';
+              luckyAgent.role === 'frontend' || luckyAgent.role === 'backend' ? 'review' : 'done';
             state.moveTask(associatedTask.id, nextStatus);
 
             state.addEvent({
@@ -660,7 +660,7 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
               taskTitle: associatedTask.title,
               taskDescription: associatedTask.description,
               taskKey: associatedTask.key,
-              stage: luckyAgent.role === 'developer' ? 'implement' : luckyAgent.role === 'reviewer' ? 'review' : 'plan',
+              stage: (luckyAgent.role === 'frontend' || luckyAgent.role === 'backend' || luckyAgent.role === 'intern') ? 'implement' : luckyAgent.role === 'reviewer' ? 'review' : 'plan',
             })
               .then((aiRes) => {
                 get().updateAgent(luckyAgent.id, {
@@ -715,7 +715,7 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
             'Menghubungkan websocket store ke visual reactive board...',
           ];
           nextThought = feThoughts[Math.floor(Math.random() * feThoughts.length)];
-        } else if (luckyAgent.role === 'backend' || luckyAgent.role === 'developer') {
+        } else if (luckyAgent.role === 'backend') {
           const devThoughts = [
             'Menulis unit tests crypto di /src/auth/jwt.service.ts...',
             'Menyusun skema JWKS asymmetric public key rotation...',
@@ -737,7 +737,7 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
             'Memeriksa kesesuaian typing strict mode TypeScript...',
           ];
           nextThought = revThoughts[Math.floor(Math.random() * revThoughts.length)];
-        } else if (luckyAgent.role === 'qa' || luckyAgent.role === 'tester') {
+        } else if (luckyAgent.role === 'qa') {
           const testThoughts = [
             'Menjalankan audit kerentanan Strix Autonomous Security Scanner...',
             'Strix memindai CWE/OWASP edge-case & boundary limits via 9Router...',
@@ -825,7 +825,7 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
             status:
               devCandidate.role === 'researcher'
                 ? 'reviewing'
-                : devCandidate.role === 'qa' || devCandidate.role === 'tester'
+                : devCandidate.role === 'qa'
                 ? 'testing'
                 : devCandidate.role === 'reviewer'
                 ? 'reviewing'

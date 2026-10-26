@@ -118,8 +118,8 @@
   - Event panggilan model disimpan di SQLite `telemetry_events` melalui `POST /api/telemetry/events`; index waktu dan model mendukung agregasi lintas sesi.
   - Dashboard [StatsPanel.tsx](file:///e:/Web/Kibi-Orchestra-V3/src/components/panels/StatsPanel.tsx) memuat tren 1j/24j/7h/30h dari `GET /api/telemetry/summary`, serta menyediakan purge dengan konfirmasi.
   - Validasi request membatasi ukuran field; self-check [telemetry.check.ts](file:///e:/Web/Kibi-Orchestra-V3/src/lib/telemetry.check.ts) menguji kenaikan event tanpa menghapus riwayat pengguna.
-- [ ] **Bersihkan Error TypeScript Lama**:
-  - `npx tsc --noEmit` masih melaporkan 8 error di [src/components/simple/AgentSettingsTab.tsx](file:///e:/Web/Kibi-Orchestra-V3/src/components/simple/AgentSettingsTab.tsx) dan [src/stores/useOfficeStore.ts](file:///e:/Web/Kibi-Orchestra-V3/src/stores/useOfficeStore.ts): perbandingan terhadap role `developer`/`tester` yang sudah dihapus di commit `8d2808f`.
+- [x] **Bersihkan Error TypeScript Lama** (Issue #28):
+  - `npx tsc --noEmit` lolos 0 error. Menghapus sisa perbandingan terhadap role legacy (`developer`, `tester`, `devops`) di [src/components/simple/AgentSettingsTab.tsx](file:///e:/Web/Kibi-Orchestra-V3/src/components/simple/AgentSettingsTab.tsx) dan [src/stores/useOfficeStore.ts](file:///e:/Web/Kibi-Orchestra-V3/src/stores/useOfficeStore.ts).
 
 ---
 
