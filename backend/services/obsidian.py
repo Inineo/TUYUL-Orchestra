@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from config import OBSIDIAN_VAULT_PATH, PROJECT_VAULT_PATH, CURRENT_PROJECT_NAME
+from config import OBSIDIAN_VAULT_PATH, PROJECT_VAULT_PATH, CURRENT_PROJECT_NAME, KNOWLEDGE_BUG_PATH
 
 class ObsidianService:
     r"""
@@ -429,6 +429,22 @@ tags:
             f.write(content.strip() + "\n")
         return file_path
 
+    def has_postmortem_for_issue(self, issue_ref: str, project_name: Optional[str] = None) -> bool:
+        """
+        Deduplication Check: Memeriksa apakah issue sudah pernah didokumentasikan di postmortems.
+        """
+        if not issue_ref or issue_ref in ["internal", "none"]:
+            return False
+        target_service = self if not project_name or project_name == self.project_name else ObsidianService(project_name=project_name)
+        ref_pattern = f'issue_reference: "{issue_ref}"'
+        for f in target_service.postmortems_path.glob("*.md"):
+            try:
+                if ref_pattern in f.read_text(encoding="utf-8")[:500]:
+                    return True
+            except Exception:
+                pass
+        return False
+
     def save_postmortem(
         self,
         title: str,
@@ -437,15 +453,17 @@ tags:
         solution: str,
         ai_learnings: str,
         project_name: Optional[str] = None,
-        issue_ref: Optional[str] = None
-    ) -> Path:
+        issue_ref: Optional[str] = None,
+        sync_global: bool = True
+    ) -> Dict[str, Any]:
         """
-        Menyimpan rekaman bug, root cause, dan solusinya ke subfolder docs/postmortems/
-        sebagai data 'experience' AI agar tidak mengulang kesalahan yang sama.
+        DUAL-SYNC POSTMORTEM:
+        1. Menyimpan ke folder lokal project: `antigravity/<project_name>/docs/postmortems/`
+        2. Menyimpan ke folder global bersama: `Knowledge Bug/<project_name>-<nama-bug>.md`
         """
         target_service = self if not project_name or project_name == self.project_name else ObsidianService(project_name=project_name)
         safe_title = target_service._sanitize_filename(title)
-        file_path = target_service.postmortems_path / f"{safe_title}.md"
+        local_file_path = target_service.postmortems_path / f"{safe_title}.md"
 
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         clean_err = target_service.sanitize_sensitive_content(issue_or_error.strip())
@@ -453,7 +471,8 @@ tags:
         clean_sol = target_service.sanitize_sensitive_content(solution.strip())
         clean_learn = target_service.sanitize_sensitive_content(ai_learnings.strip())
 
-        content = f"""---
+        # 1. Konten Dokumen Lokal Project
+        local_content = f"""---
 project: {target_service.project_name}
 type: bug_solution_log
 title: {title}
@@ -470,7 +489,7 @@ tags:
 
 > **Project Hub**: [[{target_service.project_name}-Index]]  
 > **Issue**: {issue_ref or 'Internal Bug'}  
-> **Lokasi**: `antigravity/{target_service.project_name}/docs/postmortems/{file_path.name}`  
+> **Lokasi**: `antigravity/{target_service.project_name}/docs/postmortems/{local_file_path.name}`  
 > **Tanggal Selesai**: {now_str}
 
 ---
@@ -493,9 +512,63 @@ tags:
 ## 🧠 Pembelajaran untuk AI Agent (Experience Memory)
 {clean_learn}
 """
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(content.strip() + "\n")
-        return file_path
+        with open(local_file_path, "w", encoding="utf-8") as f:
+            f.write(local_content.strip() + "\n")
+
+        # 2. Dual-Sync: Simpan ke Global Knowledge Bug Folder (Universal Cross-Project)
+        global_file_path = None
+        if sync_global and KNOWLEDGE_BUG_PATH.exists():
+            try:
+                global_filename = f"{target_service._sanitize_filename(target_service.project_name)}-{safe_title}.md"
+                global_file_path = KNOWLEDGE_BUG_PATH / global_filename
+                global_content = f"""---
+source_project: {target_service.project_name}
+type: universal_bug_solution
+title: {title}
+issue_reference: "{issue_ref or 'internal'}"
+date: {now_str}
+tags:
+  - knowledge-bug
+  - universal-experience
+  - {target_service.project_name.lower()}
+---
+
+# 🌐 [Knowledge Bug] {title}
+
+> **Source Project**: `{target_service.project_name}`  
+> **Issue Ref**: {issue_ref or 'Internal Bug'}  
+> **Tanggal Dicatat**: {now_str}
+
+---
+
+## ⚠️ Kasus / Gejala Masalah
+{clean_err}
+
+---
+
+## 🔍 Akar Masalah (Root Cause)
+{clean_rc}
+
+---
+
+## 🛠️ Solusi & Pola Perbaikan (Universal Pattern)
+{clean_sol}
+
+---
+
+## 💡 Pembelajaran Lintas Proyek (Untuk Seluruh AI Workforce)
+{clean_learn}
+"""
+                with open(global_file_path, "w", encoding="utf-8") as gf:
+                    gf.write(global_content.strip() + "\n")
+            except Exception as e:
+                print(f"[WARN] Gagal dual-sync ke Knowledge Bug global: {e}")
+
+        return {
+            "local_path": str(local_file_path),
+            "global_path": str(global_file_path) if global_file_path else None,
+            "filename": local_file_path.name
+        }
 
     def read_note(self, relative_path: str) -> Optional[str]:
         """Membaca isi file markdown di dalam folder project."""

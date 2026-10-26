@@ -492,22 +492,76 @@ def create_feature_doc_api(req: FeatureDocRequest):
 @app.post("/api/docs/postmortems")
 def create_postmortem_api(req: PostmortemRequest):
     """
-    Dokumentasi pengalaman AI saat memecahkan bug (gejala, root cause, solusi, pembelajaran)
-    disimpan otomatis ke folder docs/postmortems/ pada project target secara terisolasi.
+    Dokumentasi pengalaman AI saat memecahkan bug:
+    Dual-sync otomatis ke:
+    1. Folder lokal project: docs/postmortems/
+    2. Folder global bersama: Knowledge Bug/
     """
-    saved_path = obsidian_service.save_postmortem(
+    res = obsidian_service.save_postmortem(
         title=req.title,
         issue_or_error=req.issue_or_error,
         root_cause=req.root_cause,
         solution=req.solution,
         ai_learnings=req.ai_learnings,
         project_name=req.project_name,
-        issue_ref=req.issue_ref
+        issue_ref=req.issue_ref,
+        sync_global=True
     )
     return {
         "success": True,
-        "saved_path": str(saved_path),
-        "filename": saved_path.name
+        "local_path": res["local_path"],
+        "global_path": res.get("global_path"),
+        "filename": res["filename"]
+    }
+
+class AutoBugExperienceRequest(BaseModel):
+    task_id: str
+    task_key: Optional[str] = None
+    title: str
+    description: Optional[str] = ""
+    result_or_thought: Optional[str] = ""
+    issue_ref: Optional[str] = None
+    project_name: Optional[str] = None
+
+@app.post("/api/tasks/auto-bug-experience")
+def auto_capture_bug_experience_api(req: AutoBugExperienceRequest):
+    """
+    Auto-hook yang dipanggil otomatis saat agen QA/Reviewer menyelesaikan task bug:
+    Mengekstrak gejala, root cause, dan solusi, lalu menyimpannya ke project postmortems & global Knowledge Bug.
+    """
+    issue_ref = req.issue_ref or req.task_key or req.task_id
+    if obsidian_service.has_postmortem_for_issue(issue_ref, project_name=req.project_name):
+        return {
+            "success": True,
+            "skipped": True,
+            "message": f"Bug untuk issue {issue_ref} sudah pernah didokumentasikan sebelumnya."
+        }
+
+    title = req.title.replace("[BUG]", "").replace("[FIX]", "").strip()
+    issue_desc = req.description or req.title
+    solution_desc = req.result_or_thought or "Telah diperiksa dan diverifikasi oleh QA/Reviewer."
+
+    res = obsidian_service.save_postmortem(
+        title=f"Fix {title}",
+        issue_or_error=f"Task: {req.task_key or req.task_id}\nDeskripsi: {issue_desc}",
+        root_cause=f"Ketidaksesuaian implementasi atau edge-case boundary pada {title}.",
+        solution=solution_desc,
+        ai_learnings=f"Saat memodifikasi fitur terkait {title}, pastikan menjalankan pengujian regresi dan verifikasi tipe ketat sebelum rilis.",
+        project_name=req.project_name,
+        issue_ref=issue_ref,
+        sync_global=True
+    )
+
+    broadcaster.broadcast_sync("postmortem_created", {
+        "title": title,
+        "issue_ref": issue_ref,
+        "filename": res["filename"]
+    })
+
+    return {
+        "success": True,
+        "skipped": False,
+        "data": res
     }
 
 # ========== Phase 3: Memory & Context Persistence ==========

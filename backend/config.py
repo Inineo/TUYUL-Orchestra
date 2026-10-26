@@ -27,6 +27,11 @@ CURRENT_PROJECT_NAME = os.getenv("CURRENT_PROJECT_NAME", "Kibi-Orchestra")
 custom_proj_path = os.getenv("OBSIDIAN_PROJECT_PATH")
 PROJECT_VAULT_PATH = Path(custom_proj_path) if custom_proj_path else (OBSIDIAN_VAULT_PATH / CURRENT_PROJECT_NAME)
 
+# Global Knowledge Bug Path (Folder bersama lintas proyek)
+# Default fallback: satu level di atas folder 'antigravity' jika vault-nya terstruktur D:\Obsidian\Obsidian Memories\antigravity
+DEFAULT_KNOWLEDGE_BUG_DIR = OBSIDIAN_VAULT_PATH.parent / "Knowledge Bug" if OBSIDIAN_VAULT_PATH.name == "antigravity" else (OBSIDIAN_VAULT_PATH / "Knowledge Bug")
+KNOWLEDGE_BUG_PATH = Path(os.getenv("OBSIDIAN_KNOWLEDGE_BUG_PATH", str(DEFAULT_KNOWLEDGE_BUG_DIR)))
+
 # Ensure the directories exist safely without breaking backend if path is inaccessible
 try:
     OBSIDIAN_VAULT_PATH.mkdir(parents=True, exist_ok=True)

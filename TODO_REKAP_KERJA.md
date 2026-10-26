@@ -127,6 +127,13 @@
   - Sensor otomatis (redaction) terhadap data rahasia/kredensial (`token: [REDACTED]`) sebelum file ditulis ke disk Obsidian.
   - Endpoint baru: `POST /api/docs/features` dan `POST /api/docs/postmortems`.
   - Self-check otomatis [check_obsidian_experience.py](file:///e:/Web/Kibi-Orchestra-V3/backend/scripts/check_obsidian_experience.py) terverifikasi sukses.
+- [x] **Dual-Sync Bug Postmortems (Project Docs + Global Knowledge Bug)** (Issue #30):
+  - Menyimpan setiap perbaikan bug secara ganda:
+    1. Konteks spesifik proyek di `antigravity/<project_name>/docs/postmortems/`.
+    2. Pola universal lintas proyek di folder global `D:\Obsidian\Obsidian Memories\Knowledge Bug/`.
+  - Deduplication check otomatis: Mencegah issue bug yang sama ditulis berulang kali.
+  - Endpoint `POST /api/tasks/auto-bug-experience` dengan auto-hook di `useOfficeStore.ts` saat tiket QA / Reviewer selesai.
+  - Self-check otomatis [check_dual_bug_sync.py](file:///e:/Web/Kibi-Orchestra-V3/backend/scripts/check_dual_bug_sync.py) lolos verifikasi.
 
 ---
 

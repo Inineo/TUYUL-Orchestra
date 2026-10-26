@@ -564,6 +564,38 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
                   }
                 })
                 .catch(() => {});
+
+              // Auto-capture bug experience jika task berkaitan dengan bug/fix/vulnerability
+              const isBugTask =
+                associatedTask.title.toLowerCase().includes('bug') ||
+                associatedTask.title.toLowerCase().includes('fix') ||
+                associatedTask.title.toLowerCase().includes('error') ||
+                associatedTask.title.toLowerCase().includes('vulnerability') ||
+                (associatedTask.tags && associatedTask.tags.some((tg: string) => tg.toLowerCase() === 'bug' || tg.toLowerCase() === 'qa'));
+
+              if (isBugTask) {
+                fetch('/api/backend/tasks/auto-bug-experience', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    task_id: associatedTask.id,
+                    task_key: associatedTask.key,
+                    title: associatedTask.title,
+                    description: associatedTask.description,
+                    result_or_thought: luckyAgent.currentThought,
+                  }),
+                })
+                  .then((r) => r.json())
+                  .then((expRes) => {
+                    if (expRes.success && !expRes.skipped) {
+                      state.addEvent({
+                        type: 'artifact',
+                        message: `[KNOWLEDGE BUG] AI Intern mendokumentasikan postmortem ke project & global: ${expRes.data?.filename}`,
+                      });
+                    }
+                  })
+                  .catch(() => {});
+              }
             }
 
             // Relieve current agent into casual idle break leaving the desk
