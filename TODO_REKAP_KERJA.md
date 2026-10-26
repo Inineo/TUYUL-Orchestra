@@ -120,6 +120,13 @@
   - Validasi request membatasi ukuran field; self-check [telemetry.check.ts](file:///e:/Web/Kibi-Orchestra-V3/src/lib/telemetry.check.ts) menguji kenaikan event tanpa menghapus riwayat pengguna.
 - [x] **Bersihkan Error TypeScript Lama** (Issue #28):
   - `npx tsc --noEmit` lolos 0 error. Menghapus sisa perbandingan terhadap role legacy (`developer`, `tester`, `devops`) di [src/components/simple/AgentSettingsTab.tsx](file:///e:/Web/Kibi-Orchestra-V3/src/components/simple/AgentSettingsTab.tsx) dan [src/stores/useOfficeStore.ts](file:///e:/Web/Kibi-Orchestra-V3/src/stores/useOfficeStore.ts).
+- [x] **Project-Scoped AI Experience & Knowledge Vault** (Issue #29):
+  - Membersihkan file-file uji coba usang di Obsidian Vault `plan/` dan `conversation/`.
+  - Merestrukturisasi folder dokumentasi menjadi `docs/features/` (arsitektur metode & function) dan `docs/postmortems/` (rekaman bug & solusi).
+  - Mendukung isolasi project dinamis: setiap project baru otomatis dibuatkan folder terpisah (`antigravity/<project_name>/docs/...`) tanpa mengotori folder `Kibi-Orchestra`.
+  - Sensor otomatis (redaction) terhadap data rahasia/kredensial (`token: [REDACTED]`) sebelum file ditulis ke disk Obsidian.
+  - Endpoint baru: `POST /api/docs/features` dan `POST /api/docs/postmortems`.
+  - Self-check otomatis [check_obsidian_experience.py](file:///e:/Web/Kibi-Orchestra-V3/backend/scripts/check_obsidian_experience.py) terverifikasi sukses.
 
 ---
 

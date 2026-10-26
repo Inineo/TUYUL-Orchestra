@@ -21,11 +21,15 @@ class ObsidianService:
         self.plan_path = self.project_path / "plan"
         self.conversation_path = self.project_path / "conversation"
         self.docs_path = self.project_path / "docs"
+        self.features_path = self.docs_path / "features"
+        self.postmortems_path = self.docs_path / "postmortems"
 
         self.project_path.mkdir(parents=True, exist_ok=True)
         self.plan_path.mkdir(parents=True, exist_ok=True)
         self.conversation_path.mkdir(parents=True, exist_ok=True)
         self.docs_path.mkdir(parents=True, exist_ok=True)
+        self.features_path.mkdir(parents=True, exist_ok=True)
+        self.postmortems_path.mkdir(parents=True, exist_ok=True)
 
     def initialize_project(self, project_name: str, description: str = "") -> Dict[str, Any]:
         """
@@ -348,6 +352,146 @@ location: {self.project_name}/docs/{file_name}
                 continue
         return sorted(notes, key=lambda x: x["updated_at"], reverse=True)
 
+    def sanitize_sensitive_content(self, text: str) -> str:
+        """
+        Menyaring kata sandi, token, atau secret key agar tidak pernah tertulis ke disk.
+        """
+        sensitive_patterns = [
+            (r'(?i)(api[_-]?key|secret|token|password|passwd|credential|bearer)\s*[:=]\s*["\']?[a-zA-Z0-9_\-\.]{8,}["\']?', r'\1: [REDACTED]'),
+            (r'-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----', '[REDACTED_PRIVATE_KEY]'),
+        ]
+        sanitized = text
+        for pattern, replacement in sensitive_patterns:
+            sanitized = re.sub(pattern, replacement, sanitized)
+        return sanitized
+
+    def save_feature_doc(
+        self,
+        title: str,
+        summary: str,
+        functions_and_architecture: str,
+        best_practices: str,
+        project_name: Optional[str] = None,
+        author_role: str = "Backend & Frontend"
+    ) -> Path:
+        """
+        Menyimpan dokumentasi fitur baru (metode, arsitektur function, dan kontrak)
+        ke subfolder docs/features/ pada project target secara terisolasi.
+        """
+        target_service = self if not project_name or project_name == self.project_name else ObsidianService(project_name=project_name)
+        safe_title = target_service._sanitize_filename(title)
+        file_path = target_service.features_path / f"{safe_title}.md"
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        clean_summary = target_service.sanitize_sensitive_content(summary.strip())
+        clean_arch = target_service.sanitize_sensitive_content(functions_and_architecture.strip())
+        clean_bp = target_service.sanitize_sensitive_content(best_practices.strip())
+
+        content = f"""---
+project: {target_service.project_name}
+type: feature_documentation
+title: {title}
+author: {author_role}
+date: {now_str}
+tags:
+  - {target_service.project_name.lower()}
+  - features
+  - architecture
+---
+
+# 🚀 Fitur: {title}
+
+> **Project Hub**: [[{target_service.project_name}-Index]]  
+> **Lokasi**: `antigravity/{target_service.project_name}/docs/features/{file_path.name}`  
+> **Terakhir Diperbarui**: {now_str}
+
+---
+
+## 📌 Ringkasan Fitur
+{clean_summary}
+
+---
+
+## ⚙️ Metode & Arsitektur Function
+{clean_arch}
+
+---
+
+## 💡 Best Practice & Cara Kerja untuk AI Agent
+{clean_bp}
+"""
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(content.strip() + "\n")
+        return file_path
+
+    def save_postmortem(
+        self,
+        title: str,
+        issue_or_error: str,
+        root_cause: str,
+        solution: str,
+        ai_learnings: str,
+        project_name: Optional[str] = None,
+        issue_ref: Optional[str] = None
+    ) -> Path:
+        """
+        Menyimpan rekaman bug, root cause, dan solusinya ke subfolder docs/postmortems/
+        sebagai data 'experience' AI agar tidak mengulang kesalahan yang sama.
+        """
+        target_service = self if not project_name or project_name == self.project_name else ObsidianService(project_name=project_name)
+        safe_title = target_service._sanitize_filename(title)
+        file_path = target_service.postmortems_path / f"{safe_title}.md"
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        clean_err = target_service.sanitize_sensitive_content(issue_or_error.strip())
+        clean_rc = target_service.sanitize_sensitive_content(root_cause.strip())
+        clean_sol = target_service.sanitize_sensitive_content(solution.strip())
+        clean_learn = target_service.sanitize_sensitive_content(ai_learnings.strip())
+
+        content = f"""---
+project: {target_service.project_name}
+type: bug_solution_log
+title: {title}
+issue_reference: "{issue_ref or 'internal'}"
+date: {now_str}
+tags:
+  - {target_service.project_name.lower()}
+  - postmortems
+  - bugfix
+  - ai-learnings
+---
+
+# 🛑 Bug Fix & Postmortem: {title}
+
+> **Project Hub**: [[{target_service.project_name}-Index]]  
+> **Issue**: {issue_ref or 'Internal Bug'}  
+> **Lokasi**: `antigravity/{target_service.project_name}/docs/postmortems/{file_path.name}`  
+> **Tanggal Selesai**: {now_str}
+
+---
+
+## ⚠️ Gejala / Error yang Terjadi
+{clean_err}
+
+---
+
+## 🔍 Akar Penyebab (Root Cause)
+{clean_rc}
+
+---
+
+## 🛠️ Solusi & Cara Memperbaikinya
+{clean_sol}
+
+---
+
+## 🧠 Pembelajaran untuk AI Agent (Experience Memory)
+{clean_learn}
+"""
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(content.strip() + "\n")
+        return file_path
+
     def read_note(self, relative_path: str) -> Optional[str]:
         """Membaca isi file markdown di dalam folder project."""
         file_path = self.project_path / relative_path
@@ -360,3 +504,4 @@ location: {self.project_name}/docs/{file_name}
             with open(file_path, "r", encoding="utf-8") as f:
                 return f.read()
         return None
+

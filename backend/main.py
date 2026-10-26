@@ -134,6 +134,23 @@ class TelemetryEventRequest(BaseModel):
     completion_tokens: Annotated[int, Field(ge=0, le=10_000_000)] = 0
     error: Optional[Annotated[str, Field(max_length=500)]] = None
 
+class FeatureDocRequest(BaseModel):
+    title: Annotated[str, Field(min_length=2, max_length=150)]
+    summary: str
+    functions_and_architecture: str
+    best_practices: Optional[str] = ""
+    project_name: Optional[str] = None
+    author_role: Optional[str] = "Backend & Frontend"
+
+class PostmortemRequest(BaseModel):
+    title: Annotated[str, Field(min_length=2, max_length=150)]
+    issue_or_error: str
+    root_cause: str
+    solution: str
+    ai_learnings: str
+    project_name: Optional[str] = None
+    issue_ref: Optional[str] = None
+
 # --- Endpoints ---
 @app.get("/api/health")
 def health_check():
@@ -451,6 +468,47 @@ def create_or_update_note(req: SaveNoteRequest):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(req.content)
     return {"success": True, "saved_path": str(file_path)}
+
+@app.post("/api/docs/features")
+def create_feature_doc_api(req: FeatureDocRequest):
+    """
+    Dokumentasi fitur baru (arsitektur function, metode, cara pakai)
+    disimpan otomatis ke folder docs/features/ pada project target secara terisolasi.
+    """
+    saved_path = obsidian_service.save_feature_doc(
+        title=req.title,
+        summary=req.summary,
+        functions_and_architecture=req.functions_and_architecture,
+        best_practices=req.best_practices or "",
+        project_name=req.project_name,
+        author_role=req.author_role or "Backend & Frontend"
+    )
+    return {
+        "success": True,
+        "saved_path": str(saved_path),
+        "filename": saved_path.name
+    }
+
+@app.post("/api/docs/postmortems")
+def create_postmortem_api(req: PostmortemRequest):
+    """
+    Dokumentasi pengalaman AI saat memecahkan bug (gejala, root cause, solusi, pembelajaran)
+    disimpan otomatis ke folder docs/postmortems/ pada project target secara terisolasi.
+    """
+    saved_path = obsidian_service.save_postmortem(
+        title=req.title,
+        issue_or_error=req.issue_or_error,
+        root_cause=req.root_cause,
+        solution=req.solution,
+        ai_learnings=req.ai_learnings,
+        project_name=req.project_name,
+        issue_ref=req.issue_ref
+    )
+    return {
+        "success": True,
+        "saved_path": str(saved_path),
+        "filename": saved_path.name
+    }
 
 # ========== Phase 3: Memory & Context Persistence ==========
 

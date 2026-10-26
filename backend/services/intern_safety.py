@@ -131,7 +131,7 @@ class InternGitSafetyService:
             return {
                 "success": False,
                 "is_sensitive": True,
-                "message": "Task dinilai sensitif/privat oleh Security Gate. Disimpan eksklusif di Obsidian Vault lokal (Tidak dipublikasikan ke GitHub)."
+                "message": "Task dinilai sensitif/privat oleh Security Gate. Dibatalkan demi keamanan (tidak dipublikasikan ke GitHub)."
             }
 
         repo = "Inineo/TUYUL-Orchestra"
